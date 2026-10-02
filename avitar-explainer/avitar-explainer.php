@@ -737,6 +737,16 @@ function avitar_explainer_print_script() {
 						button.textContent = 'Explain';
 					});
 			});
+
+			// Enter sends the notes, as if Explain were clicked; Shift+Enter adds a line break.
+			// While working the button is disabled, so a repeated Enter does nothing.
+			textarea.addEventListener('keydown', function (event) {
+				if (event.key !== 'Enter' || event.shiftKey || event.isComposing) {
+					return;
+				}
+				event.preventDefault();
+				button.click();
+			});
 		}
 		document.querySelectorAll('.avitar-explainer').forEach(setup);
 	})();

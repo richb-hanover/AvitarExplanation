@@ -171,6 +171,34 @@ async function main() {
 	await tick();
 	check('a refused clipboard write falls back to the selection copy', p.calls.execCommand[0] === 'copy');
 
+	console.log('Enter key');
+	function press(p, init) {
+		const event = new p.w.KeyboardEvent('keydown', Object.assign({ key: 'Enter', bubbles: true, cancelable: true }, init));
+		p.doc.querySelector('textarea').dispatchEvent(event);
+		return event;
+	}
+	p = page({ explain: () => reply(200, SAMPLE) });
+	let event = press(p, {});
+	check('Enter in the text box sends the notes like clicking Explain', p.calls.fetch.length === 1 && p.button.disabled);
+	check('Enter does not add a line break', event.defaultPrevented);
+	event = press(p, {});
+	await settle(p);
+	check('Enter while working does not send the notes twice', p.calls.fetch.filter((url) => url.endsWith('explain')).length === 1);
+	check('a second Enter while working adds no line break either', event.defaultPrevented);
+
+	p = page({ explain: () => reply(200, SAMPLE) });
+	event = press(p, { shiftKey: true });
+	check('Shift+Enter still inserts a line break', p.calls.fetch.length === 0 && !event.defaultPrevented);
+	event = press(p, { isComposing: true });
+	check('Enter while composing text (e.g. an IME) is left alone', p.calls.fetch.length === 0 && !event.defaultPrevented);
+	event = press(p, { key: 'a' });
+	check('other keys type normally', p.calls.fetch.length === 0 && !event.defaultPrevented);
+
+	p = page({ explain: () => reply(200, SAMPLE) });
+	p.doc.querySelector('textarea').value = '   ';
+	press(p, {});
+	check('Enter with an empty box shows the same prompt as the button', p.result.textContent === 'Please paste some tax-card notes first.' && p.calls.fetch.length === 0);
+
 	console.log('diagnostics');
 	p = page({ explain: () => Promise.reject(new TypeError('NetworkError when attempting to fetch resource.')) });
 	p.button.click();
