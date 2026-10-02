@@ -647,7 +647,7 @@ function avitar_explainer_print_script() {
 				}
 				button.disabled = true;
 				button.textContent = 'Working…';
-				show('Reading the notes. This usually takes 30 to 40 seconds.', 'working');
+				show('Reviewing the notes. This usually takes 30 to 40 seconds.', 'working');
 				var started = Date.now();
 				var step = 'nonce';
 				function elapsed() {

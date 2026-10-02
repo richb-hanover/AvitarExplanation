@@ -115,7 +115,7 @@ async function main() {
 	let p = page({ explain: () => reply(200, SAMPLE) });
 	p.button.click();
 	check('working message is outlined', p.result.classList.contains('is-working'));
-	check('working message gives the measured wait time', p.result.textContent === 'Reading the notes. This usually takes 30 to 40 seconds.');
+	check('working message gives the measured wait time', p.result.textContent === 'Reviewing the notes. This usually takes 30 to 40 seconds.');
 	await settle(p);
 	check('finished explanation uses the done style', p.result.classList.contains('is-done') && !p.result.classList.contains('is-working'));
 	check('heading reads "Notes for this property"', p.result.querySelector('h3').textContent === 'Notes for this property');

@@ -19,7 +19,7 @@ Here's a quick intro to the new website:
   - The **Notes** provide a very dense description of the
     features of the property. It is in "assessor-speak".
     Copy/paste that text into the box below and click
-    **Explain** to get human-readable interpretation.
+    **Explain** to get a human-readable interpretation.
     
 [avitar_explainer]
    
