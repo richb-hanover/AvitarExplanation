@@ -33,6 +33,19 @@ $GLOBALS['avitar_test']['transients'][ 'avitar_explainer_ip_' . md5( '203.0.113.
 $e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
 check( 'rate-limited request gets 429 without calling the API', is_wp_error( $e ) && 429 === $e->get_error_data()['status'] && $calls === count( $GLOBALS['avitar_test']['http'] ) );
 
+reset_state();
+$_SERVER['REMOTE_ADDR'] = '203.0.113.51';
+$GLOBALS['avitar_test']['http_response'] = api_response( 529, array( 'type' => 'error', 'error' => array( 'type' => 'overloaded_error', 'message' => 'Overloaded' ) ) );
+avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
+$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
+check( 'busy API returns 503', is_wp_error( $e ) && 503 === $e->get_error_data()['status'] );
+check( 'busy API attempts are refunded from the daily cap', 0 === (int) get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
+$window = get_transient( 'avitar_explainer_ip_' . md5( '203.0.113.51' . 'test-salt' ) );
+check( 'busy API attempts are refunded from the IP limit', is_array( $window ) && 0 === $window['count'] );
+$GLOBALS['avitar_test']['http_response'] = api_response( 401, array( 'type' => 'error', 'error' => array( 'type' => 'authentication_error', 'message' => 'bad key' ) ) );
+avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
+check( 'other API failures still count', 1 === (int) get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
+
 check( 'shortcode is registered', isset( $GLOBALS['avitar_test']['shortcodes']['avitar_explainer'] ) );
 $html = avitar_explainer_shortcode();
 check( 'shortcode renders a textarea', false !== strpos( $html, '<textarea' ) );

@@ -11,14 +11,26 @@ $server = array(
 	'HTTP_CF_CONNECTING_IP' => '198.51.100.2',
 );
 check( 'uses REMOTE_ADDR when proxy not trusted', '203.0.113.7' === avitar_explainer_client_ip( $server, false ) );
-check( 'prefers CF-Connecting-IP when trusted', '198.51.100.2' === avitar_explainer_client_ip( $server, true ) );
+check( 'cloudflare mode uses CF-Connecting-IP', '198.51.100.2' === avitar_explainer_client_ip( $server, 'cloudflare' ) );
 check(
-	'uses first X-Forwarded-For entry when trusted',
-	'198.51.100.1' === avitar_explainer_client_ip( array( 'REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_FOR' => ' 198.51.100.1, 10.0.0.5' ), true )
+	'cloudflare mode ignores X-Forwarded-For',
+	'10.0.0.1' === avitar_explainer_client_ip( array( 'REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_FOR' => '198.51.100.1' ), 'cloudflare' )
 );
 check(
-	'falls back to REMOTE_ADDR on garbage forwarded header',
-	'10.0.0.1' === avitar_explainer_client_ip( array( 'REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_FOR' => 'not-an-ip' ), true )
+	'proxy mode uses the rightmost X-Forwarded-For entry, ignoring a spoofed leftmost one',
+	'198.51.100.1' === avitar_explainer_client_ip( array( 'REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_FOR' => '6.6.6.6, 198.51.100.1' ), 'proxy' )
+);
+check(
+	'proxy mode ignores CF-Connecting-IP',
+	'10.0.0.1' === avitar_explainer_client_ip( array( 'REMOTE_ADDR' => '10.0.0.1', 'HTTP_CF_CONNECTING_IP' => '6.6.6.6' ), 'proxy' )
+);
+check(
+	'true behaves as proxy mode',
+	'198.51.100.1' === avitar_explainer_client_ip( array( 'REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_FOR' => '6.6.6.6, 198.51.100.1' ), true )
+);
+check(
+	'falls back to REMOTE_ADDR when the rightmost forwarded entry is garbage',
+	'10.0.0.1' === avitar_explainer_client_ip( array( 'REMOTE_ADDR' => '10.0.0.1', 'HTTP_X_FORWARDED_FOR' => '198.51.100.1, not-an-ip' ), 'proxy' )
 );
 check( 'returns "unknown" with no usable address', 'unknown' === avitar_explainer_client_ip( array(), false ) );
 check( 'accepts IPv6', '2001:db8::1' === avitar_explainer_client_ip( array( 'REMOTE_ADDR' => '2001:db8::1' ), false ) );

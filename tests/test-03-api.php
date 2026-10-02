@@ -5,6 +5,10 @@ check( 'missing API key gives 500 without calling the API', is_wp_error( $e ) &&
 check( 'missing key is logged for the admin', false !== strpos( read_log(), 'ANTHROPIC_API_KEY' ) );
 check( 'missing key message to visitors does not mention config', is_wp_error( $e ) && false === strpos( $e->get_error_message(), 'ANTHROPIC' ) );
 
+$_SERVER['REMOTE_ADDR'] = '203.0.113.60';
+$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
+check( 'missing key does not use up the daily quota', is_wp_error( $e ) && 500 === $e->get_error_data()['status'] && false === get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
+
 define( 'ANTHROPIC_API_KEY', 'sk-ant-test-secret' );
 
 $body = avitar_explainer_build_request_body( 'CU*LLA' );

@@ -31,25 +31,21 @@ function avitar_explainer_config( $name ) {
 }
 
 /**
- * Visitor IP. Forwarded headers are only trusted when the site sits behind a proxy
- * (e.g. Cloudflare) that sets them; otherwise any visitor could spoof them.
+ * Visitor IP. $proxy_mode is false (use REMOTE_ADDR), 'cloudflare' (use CF-Connecting-IP),
+ * or 'proxy'/true (use the rightmost X-Forwarded-For entry, the one our own proxy appended;
+ * entries to its left come from the visitor and can be forged).
  */
-function avitar_explainer_client_ip( array $server, $trust_proxy ) {
-	if ( $trust_proxy ) {
-		$candidates = array();
-		if ( ! empty( $server['HTTP_CF_CONNECTING_IP'] ) ) {
-			$candidates[] = $server['HTTP_CF_CONNECTING_IP'];
-		}
-		if ( ! empty( $server['HTTP_X_FORWARDED_FOR'] ) ) {
-			$forwarded    = explode( ',', $server['HTTP_X_FORWARDED_FOR'] );
-			$candidates[] = $forwarded[0];
-		}
-		foreach ( $candidates as $candidate ) {
-			$candidate = trim( $candidate );
-			if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
-				return $candidate;
-			}
-		}
+function avitar_explainer_client_ip( array $server, $proxy_mode ) {
+	$candidate = '';
+	if ( 'cloudflare' === $proxy_mode && ! empty( $server['HTTP_CF_CONNECTING_IP'] ) ) {
+		$candidate = $server['HTTP_CF_CONNECTING_IP'];
+	} elseif ( ( true === $proxy_mode || 'proxy' === $proxy_mode ) && ! empty( $server['HTTP_X_FORWARDED_FOR'] ) ) {
+		$forwarded = explode( ',', $server['HTTP_X_FORWARDED_FOR'] );
+		$candidate = end( $forwarded );
+	}
+	$candidate = trim( $candidate );
+	if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
+		return $candidate;
 	}
 	$remote = isset( $server['REMOTE_ADDR'] ) ? trim( $server['REMOTE_ADDR'] ) : '';
 	return filter_var( $remote, FILTER_VALIDATE_IP ) ? $remote : 'unknown';
@@ -81,8 +77,7 @@ function avitar_explainer_validate_notes( $notes ) {
  * write isn't atomic; an occasional extra request under load is acceptable.
  */
 function avitar_explainer_check_rate_limit( $ip, $now ) {
-	$ip_key  = 'avitar_explainer_ip_' . md5( $ip . wp_salt( 'nonce' ) );
-	$day_key = 'avitar_explainer_day_' . wp_date( 'Ymd', $now );
+	list( $ip_key, $day_key ) = avitar_explainer_rate_limit_keys( $ip, $now );
 
 	$window = get_transient( $ip_key );
 	if ( ! is_array( $window ) || $now - $window['start'] >= HOUR_IN_SECONDS ) {
@@ -112,6 +107,31 @@ function avitar_explainer_check_rate_limit( $ip, $now ) {
 	set_transient( $ip_key, $window, max( 1, $window_ends - $now ) );
 	set_transient( $day_key, $day_count + 1, DAY_IN_SECONDS + HOUR_IN_SECONDS );
 	return true;
+}
+
+/**
+ * Gives back a request counted by avitar_explainer_check_rate_limit() when the API was
+ * too busy to process it, so retries during an Anthropic outage don't use up the quotas.
+ */
+function avitar_explainer_refund_rate_limit( $ip, $now ) {
+	list( $ip_key, $day_key ) = avitar_explainer_rate_limit_keys( $ip, $now );
+
+	$window = get_transient( $ip_key );
+	if ( is_array( $window ) && $window['count'] > 0 ) {
+		$window['count']--;
+		set_transient( $ip_key, $window, max( 1, $window['start'] + HOUR_IN_SECONDS - $now ) );
+	}
+	$day_count = (int) get_transient( $day_key );
+	if ( $day_count > 0 ) {
+		set_transient( $day_key, $day_count - 1, DAY_IN_SECONDS + HOUR_IN_SECONDS );
+	}
+}
+
+function avitar_explainer_rate_limit_keys( $ip, $now ) {
+	return array(
+		'avitar_explainer_ip_' . md5( $ip . wp_salt( 'nonce' ) ),
+		'avitar_explainer_day_' . wp_date( 'Ymd', $now ),
+	);
 }
 
 function avitar_explainer_system_prompt() {
@@ -238,8 +258,12 @@ function avitar_explainer_parse_response( $response ) {
 	return $text;
 }
 
+function avitar_explainer_api_key() {
+	return defined( 'ANTHROPIC_API_KEY' ) ? (string) ANTHROPIC_API_KEY : '';
+}
+
 function avitar_explainer_call_api( $notes ) {
-	$api_key = defined( 'ANTHROPIC_API_KEY' ) ? (string) ANTHROPIC_API_KEY : '';
+	$api_key = avitar_explainer_api_key();
 	if ( '' === $api_key ) {
 		error_log( 'Avitar Explainer: ANTHROPIC_API_KEY is not defined in wp-config.php.' );
 		return new WP_Error(
@@ -318,14 +342,23 @@ function avitar_explainer_handle_explain( $request ) {
 		return $notes;
 	}
 
-	$ip      = avitar_explainer_client_ip( $_SERVER, (bool) avitar_explainer_config( 'TRUSTED_PROXY' ) );
-	$allowed = avitar_explainer_check_rate_limit( $ip, time() );
+	// Without a key, return the "not set up" error before counting, so it doesn't burn quota.
+	if ( '' === avitar_explainer_api_key() ) {
+		return avitar_explainer_call_api( $notes );
+	}
+
+	$ip      = avitar_explainer_client_ip( $_SERVER, avitar_explainer_config( 'TRUSTED_PROXY' ) );
+	$now     = time();
+	$allowed = avitar_explainer_check_rate_limit( $ip, $now );
 	if ( is_wp_error( $allowed ) ) {
 		return $allowed;
 	}
 
 	$explanation = avitar_explainer_call_api( $notes );
 	if ( is_wp_error( $explanation ) ) {
+		if ( 'avitar_busy' === $explanation->get_error_code() ) {
+			avitar_explainer_refund_rate_limit( $ip, $now );
+		}
 		return $explanation;
 	}
 	return new WP_REST_Response( array( 'explanation' => $explanation ), 200 );

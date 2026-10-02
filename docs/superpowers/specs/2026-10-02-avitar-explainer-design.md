@@ -24,7 +24,7 @@ Expected volume: up to ~250 queries on day one, < 500 total over time.
 | `AVITAR_EXPLAINER_IP_LIMIT` | 30 per hour per IP |
 | `AVITAR_EXPLAINER_DAILY_LIMIT` | 500 per day site-wide |
 | `AVITAR_EXPLAINER_MAX_CHARS` | 4000 |
-| `AVITAR_EXPLAINER_TRUSTED_PROXY` | false (when true, use `CF-Connecting-IP` / first `X-Forwarded-For`) |
+| `AVITAR_EXPLAINER_TRUSTED_PROXY` | false; `'cloudflare'` uses `CF-Connecting-IP`; `'proxy'`/true uses the rightmost `X-Forwarded-For` entry (leftmost entries are visitor-forgeable) |
 
 ## Flow
 
