@@ -8,6 +8,13 @@ check( 'leading "Notes:" label is removed', 'CU*LLA' === avitar_explainer_valida
 check( '"Notes:" label match ignores case and spacing', 'CU' === avitar_explainer_validate_notes( "  NOTES :CU" ) );
 check( 'a bare "Notes:" counts as empty', is_wp_error( avitar_explainer_validate_notes( "Notes:  " ) ) );
 check( '"Notes" without a colon is kept', 'NOTES TO FILE*CU' === avitar_explainer_validate_notes( 'NOTES TO FILE*CU' ) );
+check( 'text before "Notes:" is ignored', 'VIEW POT*CU' === avitar_explainer_validate_notes( "Parcel ID: 401-38\nOwners: SMITH JOHN\nAcres: 2.1\nNotes: VIEW POT*CU" ) );
+check( 'only the first "Notes:" is used', 'A*B NOTES: C' === avitar_explainer_validate_notes( "Header\nNotes: A*B NOTES: C" ) );
+check( '"FOOTNOTES:" is not a Notes label', 'FOOTNOTES: X*CU' === avitar_explainer_validate_notes( 'FOOTNOTES: X*CU' ) );
+check( 'a long page copy is accepted when the notes are short', 'CU*LLA' === avitar_explainer_validate_notes( str_repeat( 'Owner info ', 1500 ) . "Notes: CU*LLA" ) );
+check( 'notes after "Notes:" still respect the 4000-character limit', is_wp_error( avitar_explainer_validate_notes( 'Notes: ' . str_repeat( 'a', 4001 ) ) ) );
+$e = avitar_explainer_validate_notes( str_repeat( 'a', 20001 ) . ' Notes: CU' );
+check( 'pastes over 20000 characters are rejected', is_wp_error( $e ) && 400 === $e->get_error_data()['status'] );
 check( 'exactly 4000 multibyte characters accepted', is_string( avitar_explainer_validate_notes( str_repeat( 'é', 4000 ) ) ) );
 $e = avitar_explainer_validate_notes( str_repeat( 'a', 4001 ) );
 check( '4001 characters rejected with 400', is_wp_error( $e ) && 400 === $e->get_error_data()['status'] );

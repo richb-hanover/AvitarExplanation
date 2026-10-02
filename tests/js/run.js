@@ -48,7 +48,7 @@ function page({ explain, nonce, clipboard }) {
 		{ runScripts: 'outside-only', url: 'http://site.test/' }
 	);
 	const w = dom.window;
-	const calls = { fetch: [], execCommand: [], clipboard: [] };
+	const calls = { fetch: [], execCommand: [], clipboard: [], scroll: [] };
 	const errors = [];
 	w.fetch = (url, options) => {
 		calls.fetch.push(url);
@@ -78,6 +78,10 @@ function page({ explain, nonce, clipboard }) {
 			},
 		});
 	}
+	w.scrollTo = (options) => calls.scroll.push(options);
+	Object.defineProperty(w, 'innerHeight', { configurable: true, value: 800 });
+	Object.defineProperty(w, 'scrollY', { configurable: true, value: 300 });
+	w.document.querySelector('.avitar-explainer__result').getBoundingClientRect = () => ({ top: 1200 });
 	w.eval(script);
 	const doc = w.document;
 	return {
@@ -126,6 +130,8 @@ async function main() {
 	const summaryNode = p.result.querySelector('.avitar-explainer__summary');
 	check('summary is shown', !!summaryNode && summaryNode.textContent === 'Summary: A pondside lot.');
 	check('summary comes right after the heading, before the list', !!summaryNode && summaryNode.previousElementSibling.tagName === 'H3' && summaryNode.nextElementSibling.tagName === 'OL');
+	check('explanation top is scrolled to the middle of the window', p.calls.scroll.length === 1 && p.calls.scroll[0].top === 300 + 1200 - 400);
+	check('scrolling is smooth', p.calls.scroll.length === 1 && p.calls.scroll[0].behavior === 'smooth');
 	check('response time shown', /^Response time: \d+\.\d s$/.test(p.result.querySelector('.avitar-explainer__time').textContent));
 
 	console.log('copy button');
@@ -195,6 +201,7 @@ async function main() {
 	p.button.click();
 	await settle(p);
 	check('server messages are still shown to the visitor', p.result.textContent.includes('Too many requests from your network.'));
+	check('errors do not scroll the page', p.calls.scroll.length === 0);
 
 	p = page({ explain: () => reply(200, { explanation: 'I can only explain tax-card notes.', items: [], summary: '', extra: ['I can only explain tax-card notes.'] }) });
 	p.button.click();

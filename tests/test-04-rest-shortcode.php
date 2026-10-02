@@ -50,6 +50,7 @@ check( 'other API failures still count', 1 === (int) get_transient( 'avitar_expl
 check( 'shortcode is registered', isset( $GLOBALS['avitar_test']['shortcodes']['avitar_explainer'] ) );
 $html = avitar_explainer_shortcode();
 check( 'shortcode renders a textarea', false !== strpos( $html, '<textarea' ) );
+check( 'text box accepts a whole-page paste of 20000 characters', false !== strpos( $html, 'maxlength="20000"' ) );
 check( 'shortcode renders the button', false !== strpos( $html, '>Explain</button>' ) );
 check( 'Explain button comes before the text box', strpos( $html, '>Explain</button>' ) < strpos( $html, '<textarea' ) );
 check( 'label and button share a row above the text box', 1 === preg_match( '/<div class="avitar-explainer__bar">\s*<label[^>]*>[^<]*<\/label>\s*<button[^>]*>Explain<\/button>\s*<\/div>\s*<textarea/', $html ) );

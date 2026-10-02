@@ -54,13 +54,32 @@ function avitar_explainer_client_ip( array $server, $proxy_mode ) {
 /**
  * Returns the trimmed notes, or a 400 WP_Error the visitor can act on.
  */
+/**
+ * Visitors may copy most of the Avitar page rather than just the notes, so the text box
+ * accepts several times MAX_CHARS; the MAX_CHARS limit applies once the notes are extracted.
+ */
+function avitar_explainer_max_paste_chars() {
+	return 5 * (int) avitar_explainer_config( 'MAX_CHARS' );
+}
+
 function avitar_explainer_validate_notes( $notes ) {
-	// Visitors often copy Avitar's "Notes:" label along with the notes themselves.
-	$notes = is_string( $notes ) ? trim( preg_replace( '/^\s*notes\s*:/i', '', $notes ) ) : '';
+	$notes = is_string( $notes ) ? $notes : '';
+	if ( mb_strlen( $notes, 'UTF-8' ) > avitar_explainer_max_paste_chars() ) {
+		return new WP_Error(
+			'avitar_too_long',
+			'That is too much text. Please paste just the Notes from the tax card.',
+			array( 'status' => 400 )
+		);
+	}
+
+	// Avitar labels the notes "Notes:". Ignore everything up to the first such label, so
+	// pasting the label (or most of the page) works; without one, use the whole text.
+	$parts = preg_split( '/\bnotes\s*:/i', $notes, 2 );
+	$notes = trim( end( $parts ) );
 	if ( '' === $notes ) {
 		return new WP_Error( 'avitar_empty', 'Please paste some tax-card notes first.', array( 'status' => 400 ) );
 	}
-	$max   = (int) avitar_explainer_config( 'MAX_CHARS' );
+	$max = (int) avitar_explainer_config( 'MAX_CHARS' );
 	if ( mb_strlen( $notes, 'UTF-8' ) > $max ) {
 		return new WP_Error(
 			'avitar_too_long',
@@ -460,7 +479,7 @@ function avitar_explainer_shortcode() {
 			<label for="<?php echo esc_attr( $field_id ); ?>">Paste the notes from an Avitar tax card</label>
 			<button type="button" class="avitar-explainer__button">Explain</button>
 		</div>
-		<textarea id="<?php echo esc_attr( $field_id ); ?>" rows="8" maxlength="<?php echo (int) avitar_explainer_config( 'MAX_CHARS' ); ?>" placeholder="<?php echo esc_attr( 'VIEW POT GOOD TOPO* INC FORMER LOT 2 PONDSIDE*8712 SF OUT OF CU ...' ); ?>"></textarea>
+		<textarea id="<?php echo esc_attr( $field_id ); ?>" rows="8" maxlength="<?php echo (int) avitar_explainer_max_paste_chars(); ?>" placeholder="<?php echo esc_attr( 'VIEW POT GOOD TOPO* INC FORMER LOT 2 PONDSIDE*8712 SF OUT OF CU ...' ); ?>"></textarea>
 		<div class="avitar-explainer__result" aria-live="polite"></div>
 		<p class="avitar-explainer__note">Explanations are AI-generated and may contain mistakes. Confirm anything important with the town assessing office.</p>
 	</div>
@@ -538,6 +557,15 @@ function avitar_explainer_print_script() {
 			selection.removeAllRanges();
 			document.body.removeChild(content);
 			return copied;
+		}
+
+		// Brings the top of an element to the middle of the window.
+		function scrollToMiddle(element) {
+			var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+			window.scrollTo({
+				top: window.scrollY + element.getBoundingClientRect().top - window.innerHeight / 2,
+				behavior: reduceMotion ? 'auto' : 'smooth'
+			});
 		}
 
 		function setup(root) {
@@ -637,6 +665,7 @@ function avitar_explainer_print_script() {
 					add(result, 'div', body.explanation, 'avitar-explainer__plain');
 				}
 				add(result, 'p', 'Response time: ' + seconds.toFixed(1) + ' s', 'avitar-explainer__time');
+				scrollToMiddle(result);
 			}
 
 			button.addEventListener('click', function () {
