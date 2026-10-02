@@ -432,9 +432,9 @@ function avitar_explainer_shortcode() {
 		?>
 		<style>
 			.avitar-explainer { margin: 1.5em 0; }
-			.avitar-explainer label { display: block; font-weight: 600; margin-bottom: 0.4em; }
+			.avitar-explainer__bar { display: flex; justify-content: space-between; align-items: flex-end; gap: 1em; flex-wrap: wrap; margin-bottom: 0.4em; }
+			.avitar-explainer label { font-weight: 600; }
 			.avitar-explainer textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.95em; }
-			.avitar-explainer__button { margin-top: 0.6em; }
 			.avitar-explainer__result { margin-top: 1em; line-height: 1.5; }
 			.avitar-explainer__result.is-working, .avitar-explainer__result.is-error { padding: 1em; border: 1px solid #ccc; border-radius: 4px; }
 			.avitar-explainer__result.is-error { border-color: #b32d2e; color: #b32d2e; }
@@ -456,9 +456,11 @@ function avitar_explainer_shortcode() {
 	endif;
 	?>
 	<div class="avitar-explainer" data-rest="<?php echo esc_url( rest_url( AVITAR_EXPLAINER_REST_NS . '/' ) ); ?>">
-		<label for="<?php echo esc_attr( $field_id ); ?>">Paste the notes from an Avitar tax card</label>
+		<div class="avitar-explainer__bar">
+			<label for="<?php echo esc_attr( $field_id ); ?>">Paste the notes from an Avitar tax card</label>
+			<button type="button" class="avitar-explainer__button">Explain</button>
+		</div>
 		<textarea id="<?php echo esc_attr( $field_id ); ?>" rows="8" maxlength="<?php echo (int) avitar_explainer_config( 'MAX_CHARS' ); ?>" placeholder="<?php echo esc_attr( 'VIEW POT GOOD TOPO* INC FORMER LOT 2 PONDSIDE*8712 SF OUT OF CU ...' ); ?>"></textarea>
-		<button type="button" class="avitar-explainer__button">Explain</button>
 		<div class="avitar-explainer__result" aria-live="polite"></div>
 		<p class="avitar-explainer__note">Explanations are AI-generated and may contain mistakes. Confirm anything important with the town assessing office.</p>
 	</div>

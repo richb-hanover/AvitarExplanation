@@ -18,8 +18,8 @@ Here's a quick intro to the new website:
   - Information about the valuation
   - The **Notes** provide a very dense description of the
     features of the property. It is in "assessor-speak".
-    Copy/paste that text into the box below to get
-    a human-readable interpretation.
+    Copy/paste that text into the box below and click
+    **Explain** to get human-readable interpretation.
     
 [avitar_explainer]
    
