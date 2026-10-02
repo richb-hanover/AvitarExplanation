@@ -43,12 +43,13 @@ const SAMPLE = {
 function page({ explain, nonce, clipboard }) {
 	const dom = new JSDOM(
 		'<div class="avitar-explainer" data-rest="http://site.test/wp-json/avitar-explainer/v1/">' +
-			'<textarea>CU*LLA</textarea><button type="button" class="avitar-explainer__button">Explain</button>' +
+			'<div class="avitar-explainer__bar"><label>Paste the notes</label><button type="button" class="avitar-explainer__button">Explain</button></div>' +
+			'<textarea>CU*LLA</textarea>' +
 			'<div class="avitar-explainer__result" aria-live="polite"></div></div>',
 		{ runScripts: 'outside-only', url: 'http://site.test/' }
 	);
 	const w = dom.window;
-	const calls = { fetch: [], execCommand: [], clipboard: [], scroll: [] };
+	const calls = { fetch: [], execCommand: [], clipboard: [], scroll: [], scrollIntoView: [] };
 	const errors = [];
 	w.fetch = (url, options) => {
 		calls.fetch.push(url);
@@ -82,6 +83,9 @@ function page({ explain, nonce, clipboard }) {
 	Object.defineProperty(w, 'innerHeight', { configurable: true, value: 800 });
 	Object.defineProperty(w, 'scrollY', { configurable: true, value: 300 });
 	w.document.querySelector('.avitar-explainer__result').getBoundingClientRect = () => ({ top: 1200 });
+	w.Element.prototype.scrollIntoView = function (options) {
+		calls.scrollIntoView.push({ element: this, options: options });
+	};
 	w.eval(script);
 	const doc = w.document;
 	return {
@@ -130,8 +134,9 @@ async function main() {
 	const summaryNode = p.result.querySelector('.avitar-explainer__summary');
 	check('summary is shown', !!summaryNode && summaryNode.textContent === 'Summary: A pondside lot.');
 	check('summary comes right after the heading, before the list', !!summaryNode && summaryNode.previousElementSibling.tagName === 'H3' && summaryNode.nextElementSibling.tagName === 'OL');
-	check('explanation top is scrolled to the middle of the window', p.calls.scroll.length === 1 && p.calls.scroll[0].top === 300 + 1200 - 400);
-	check('scrolling is smooth', p.calls.scroll.length === 1 && p.calls.scroll[0].behavior === 'smooth');
+	check('clicking Explain scrolls the label row to the top of the window', p.calls.scrollIntoView.length === 1 && p.calls.scrollIntoView[0].element.className === 'avitar-explainer__bar' && p.calls.scrollIntoView[0].options.block === 'start');
+	check('that scroll is smooth', p.calls.scrollIntoView.length === 1 && p.calls.scrollIntoView[0].options.behavior === 'smooth');
+	check('the arriving explanation does not scroll the page again', p.calls.scroll.length === 0 && p.calls.scrollIntoView.length === 1);
 	check('response time shown', /^Response time: \d+\.\d s$/.test(p.result.querySelector('.avitar-explainer__time').textContent));
 
 	console.log('copy button');
@@ -181,6 +186,7 @@ async function main() {
 	let event = press(p, {});
 	check('Enter in the text box sends the notes like clicking Explain', p.calls.fetch.length === 1 && p.button.disabled);
 	check('Enter does not add a line break', event.defaultPrevented);
+	check('Enter also scrolls the label row to the top', p.calls.scrollIntoView.length === 1);
 	event = press(p, {});
 	await settle(p);
 	check('Enter while working does not send the notes twice', p.calls.fetch.filter((url) => url.endsWith('explain')).length === 1);
@@ -198,6 +204,7 @@ async function main() {
 	p.doc.querySelector('textarea').value = '   ';
 	press(p, {});
 	check('Enter with an empty box shows the same prompt as the button', p.result.textContent === 'Please paste some tax-card notes first.' && p.calls.fetch.length === 0);
+	check('an empty box does not scroll', p.calls.scrollIntoView.length === 0);
 
 	console.log('diagnostics');
 	p = page({ explain: () => Promise.reject(new TypeError('NetworkError when attempting to fetch resource.')) });

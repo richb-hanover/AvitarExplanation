@@ -467,7 +467,7 @@ function avitar_explainer_shortcode() {
 		?>
 		<style>
 			.avitar-explainer { margin: 1.5em 0; }
-			.avitar-explainer__bar { display: flex; justify-content: space-between; align-items: flex-end; gap: 1em; flex-wrap: wrap; margin-bottom: 0.4em; }
+			.avitar-explainer__bar { display: flex; justify-content: space-between; align-items: flex-end; gap: 1em; flex-wrap: wrap; margin-bottom: 0.4em; scroll-margin-top: calc(var(--wp-admin--admin-bar--height, 0px) + 0.5em); }
 			.avitar-explainer label { font-weight: 600; }
 			.avitar-explainer textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.95em; }
 			.avitar-explainer__result { margin-top: 1em; line-height: 1.5; }
@@ -575,13 +575,11 @@ function avitar_explainer_print_script() {
 			return copied;
 		}
 
-		// Brings the top of an element to the middle of the window.
-		function scrollToMiddle(element) {
+		// Brings an element to the top of the window (its CSS scroll-margin-top leaves
+		// room for the WordPress admin bar).
+		function scrollToTop(element) {
 			var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-			window.scrollTo({
-				top: window.scrollY + element.getBoundingClientRect().top - window.innerHeight / 2,
-				behavior: reduceMotion ? 'auto' : 'smooth'
-			});
+			element.scrollIntoView({ block: 'start', behavior: reduceMotion ? 'auto' : 'smooth' });
 		}
 
 		function setup(root) {
@@ -681,7 +679,6 @@ function avitar_explainer_print_script() {
 					add(result, 'div', body.explanation, 'avitar-explainer__plain');
 				}
 				add(result, 'p', 'Response time: ' + seconds.toFixed(1) + ' s', 'avitar-explainer__time');
-				scrollToMiddle(result);
 			}
 
 			button.addEventListener('click', function () {
@@ -690,6 +687,7 @@ function avitar_explainer_print_script() {
 					show('Please paste some tax-card notes first.', 'error');
 					return;
 				}
+				scrollToTop(root.querySelector('.avitar-explainer__bar'));
 				button.disabled = true;
 				button.textContent = 'Working…';
 				show('Reviewing the notes. This usually takes 30 to 40 seconds.', 'working');

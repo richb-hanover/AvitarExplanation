@@ -44,7 +44,7 @@ Each explanation costs a few cents on Opus 5.5 (a rough estimate of 5–10¢; th
 - An explanation usually takes 30–40 seconds. The plugin asks PHP for up to 150 seconds, but some hosts and proxies cut requests off sooner (Cloudflare at 100 seconds, some shared hosts at 30–60), so test on your host.
 - Visitors can paste just the notes, the notes with their label, or most of the Avitar page. The plugin keeps only the text between the last lowercase "help" and the "Avitar Associates of New England, Inc." footer, then drops anything up to the first "Notes:" label. Text without these markers is used as-is. The text box accepts up to 5× `AVITAR_EXPLAINER_MAX_CHARS` so a whole-page paste isn't cut off; the limit applies to the notes themselves.
 - Pressing Enter in the text box works like clicking **Explain** (Shift+Enter adds a line break).
-- When the explanation arrives, the page scrolls so its top is in the middle of the window.
+- Clicking **Explain** (or pressing Enter) scrolls the text box and its label to the top of the window, leaving room for the WordPress admin bar, so the explanation appears just below.
 - If the AI service is overloaded, the failed attempt isn't counted against the limits.
 - Errors with details (bad API key, API outages) are written to the PHP error log; visitors see a short friendly message. If something fails in the browser, the page says which step failed (security token, waiting for the explanation, or showing it) and logs the error to the browser console.
 - The copy icon copies the explanation with its formatting. Copying uses the modern clipboard on HTTPS sites (and `localhost`) and falls back to the browser's own copy elsewhere.
