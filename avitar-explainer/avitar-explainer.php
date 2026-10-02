@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Avitar Explainer
  * Description: Adds the [avitar_explainer] shortcode, which explains Avitar Associates tax-card notes in plain English using Claude.
- * Version: 1.0.2
+ * Version: 1.0.3
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
@@ -58,6 +58,23 @@ function avitar_explainer_client_ip( array $server, $proxy_mode ) {
  * Visitors may copy most of the Avitar page rather than just the notes, so the text box
  * accepts several times MAX_CHARS; the MAX_CHARS limit applies once the notes are extracted.
  */
+function avitar_explainer_not_notes_error( $status ) {
+	return new WP_Error( 'avitar_not_notes', "This doesn't look like the right data.", array( 'status' => $status ) );
+}
+
+/**
+ * Real Avitar notes are written in capitals and separated by "*". Anything else is
+ * rejected before it reaches Claude, which keeps the page from being used as a chatbot.
+ */
+function avitar_explainer_looks_like_notes( $notes ) {
+	if ( false === strpos( $notes, '*' ) ) {
+		return false;
+	}
+	$upper = preg_match_all( '/\p{Lu}/u', $notes );
+	$lower = preg_match_all( '/\p{Ll}/u', $notes );
+	return $upper > 0 && $upper >= 3 * $lower; // At least 75% of letters are uppercase.
+}
+
 function avitar_explainer_max_paste_chars() {
 	return 5 * (int) avitar_explainer_config( 'MAX_CHARS' );
 }
@@ -102,6 +119,9 @@ function avitar_explainer_validate_notes( $notes ) {
 			sprintf( 'Those notes are too long. Please paste at most %d characters.', $max ),
 			array( 'status' => 400 )
 		);
+	}
+	if ( ! avitar_explainer_looks_like_notes( $notes ) ) {
+		return avitar_explainer_not_notes_error( 400 );
 	}
 	return $notes;
 }
@@ -215,7 +235,9 @@ PROMPT;
 function avitar_explainer_build_request_body( $notes ) {
 	return array(
 		'model'         => avitar_explainer_config( 'MODEL' ),
-		'max_tokens'    => 16000,
+		// A typical card uses ~2,300 output tokens (thinking included); 6,000 leaves room
+		// for long cards while capping the cost of any single request.
+		'max_tokens'    => 6000,
 		'output_config' => array( 'effort' => 'medium' ),
 		// Server-side refusal fallback: if a safety classifier declines, the API retries on a suitable model.
 		'fallbacks'     => 'default',
@@ -443,7 +465,13 @@ function avitar_explainer_handle_explain( $request ) {
 		}
 		return $explanation;
 	}
+	// Legitimate answers are always a numbered list. Anything else (e.g. Claude was talked
+	// into writing something unrelated) is never shown.
 	$parts = avitar_explainer_structure_explanation( $explanation );
+	if ( empty( $parts['items'] ) ) {
+		error_log( 'Avitar Explainer: answer was not a numbered list; not shown: ' . substr( $explanation, 0, 500 ) );
+		return avitar_explainer_not_notes_error( 422 );
+	}
 	return new WP_REST_Response(
 		array(
 			'explanation' => $explanation,

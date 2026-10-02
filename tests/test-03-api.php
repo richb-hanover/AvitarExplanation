@@ -6,14 +6,14 @@ check( 'missing key is logged for the admin', false !== strpos( read_log(), 'ANT
 check( 'missing key message to visitors does not mention config', is_wp_error( $e ) && false === strpos( $e->get_error_message(), 'ANTHROPIC' ) );
 
 $_SERVER['REMOTE_ADDR'] = '203.0.113.60';
-$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
+$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU*LLA' ) ) );
 check( 'missing key does not use up the daily quota', is_wp_error( $e ) && 500 === $e->get_error_data()['status'] && false === get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
 
 define( 'ANTHROPIC_API_KEY', 'sk-ant-test-secret' );
 
 $body = avitar_explainer_build_request_body( 'CU*LLA' );
 check( 'request uses the configured model', 'claude-opus-5-5' === $body['model'] );
-check( 'request sets max_tokens 16000', 16000 === $body['max_tokens'] );
+check( 'request caps max_tokens at 6000', 6000 === $body['max_tokens'] );
 check( 'request sets explicit medium effort', 'medium' === $body['output_config']['effort'] );
 check( 'request enables default fallbacks', 'default' === $body['fallbacks'] );
 check( 'system prompt defines the Uncertain marker', false !== strpos( $body['system'], '⚠ Uncertain:' ) );

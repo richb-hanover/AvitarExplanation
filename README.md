@@ -36,13 +36,15 @@ define( 'AVITAR_EXPLAINER_TRUSTED_PROXY', 'cloudflare' );
 | `AVITAR_EXPLAINER_MODEL` | `claude-opus-5-5` | Claude model |
 | `AVITAR_EXPLAINER_TRUSTED_PROXY` | `false` | Only if the site is behind a proxy: `'cloudflare'` (uses `CF-Connecting-IP`) or `'proxy'` (uses the last `X-Forwarded-For` entry, which your proxy adds). Leave `false` otherwise, or visitors can fake their IP to dodge the limits |
 
-Each explanation costs a few cents on Opus 5.5 (a rough estimate of 5–10¢; the Anthropic Console's usage page shows actual spending).
+Each explanation costs about 5¢ on Opus 5.5 (measured on a typical card: ~1,300 input and ~2,300 output tokens); at most about 13¢. The Anthropic Console's usage page shows actual spending; setting a monthly spend limit there is a good backstop.
 
 ## Notes
 
 - The **Explain** button fetches a fresh security token each time, so page-caching plugins don't break it.
 - An explanation usually takes 30–40 seconds. The plugin asks PHP for up to 150 seconds, but some hosts and proxies cut requests off sooner (Cloudflare at 100 seconds, some shared hosts at 30–60), so test on your host.
 - Visitors can paste just the notes, the notes with their label, or most of the Avitar page. The plugin keeps only the text between the last lowercase "help" and the "Avitar Associates of New England, Inc." footer, then drops anything up to the first "Notes:" label. Text without these markers is used as-is. The text box accepts up to 5× `AVITAR_EXPLAINER_MAX_CHARS` so a whole-page paste isn't cut off; the limit applies to the notes themselves.
+- To keep the page from being used as a general chatbot, pasted text must contain at least one `*` and be at least 75% uppercase letters, and Claude's answer must be a numbered list. Otherwise the visitor sees "This doesn't look like the right data." (rejected input never reaches Claude; a rejected answer is logged, not shown).
+- Each answer is capped at 6,000 output tokens (a typical card uses about 2,300), which limits the worst-case cost of a request to roughly 13¢.
 - Pressing Enter in the text box works like clicking **Explain** (Shift+Enter adds a line break).
 - Clicking **Explain** (or pressing Enter) scrolls the "Reviewing the notes" message to the top of the window, leaving room for the WordPress admin bar. The explanation replaces the message in the same spot.
 - If the AI service is overloaded, the failed attempt isn't counted against the limits.

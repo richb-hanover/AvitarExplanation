@@ -18,11 +18,11 @@ check( 'valid nonce passes', true === avitar_explainer_verify_nonce( new WP_REST
 $_SERVER['REMOTE_ADDR'] = '203.0.113.50';
 $GLOBALS['avitar_test']['http_response'] = api_response( 200, array(
 	'stop_reason' => 'end_turn',
-	'content'     => array( array( 'type' => 'text', 'text' => 'Explained.' ) ),
+	'content'     => array( array( 'type' => 'text', 'text' => "1. \"CU\"\nCurrent Use.\n\nSummary: Explained." ) ),
 ) );
 $r = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU*LLA' ) ) );
-check( 'explain returns the explanation', $r instanceof WP_REST_Response && 'Explained.' === $r->get_data()['explanation'] );
-check( 'explain returns structured parts', array() === $r->get_data()['items'] && array( 'Explained.' ) === $r->get_data()['extra'] && '' === $r->get_data()['summary'] );
+check( 'explain returns the explanation', $r instanceof WP_REST_Response && 0 === strpos( $r->get_data()['explanation'], '1. "CU"' ) );
+check( 'explain returns structured parts', 1 === count( $r->get_data()['items'] ) && 'CU' === $r->get_data()['items'][0]['segment'] && 'Explained.' === $r->get_data()['summary'] );
 check( 'explain response does not contain the key', false === strpos( json_encode( $r->get_data() ), 'sk-ant' ) );
 check( 'explain counted toward the daily cap', 1 === get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
 
@@ -31,21 +31,31 @@ $e     = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' =>
 check( 'empty notes rejected without calling the API', is_wp_error( $e ) && $calls === count( $GLOBALS['avitar_test']['http'] ) );
 
 $GLOBALS['avitar_test']['transients'][ 'avitar_explainer_ip_' . md5( '203.0.113.50' . 'test-salt' ) ] = array( 'start' => time(), 'count' => 30 );
-$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
+$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU*LLA' ) ) );
 check( 'rate-limited request gets 429 without calling the API', is_wp_error( $e ) && 429 === $e->get_error_data()['status'] && $calls === count( $GLOBALS['avitar_test']['http'] ) );
 
 reset_state();
 $_SERVER['REMOTE_ADDR'] = '203.0.113.51';
 $GLOBALS['avitar_test']['http_response'] = api_response( 529, array( 'type' => 'error', 'error' => array( 'type' => 'overloaded_error', 'message' => 'Overloaded' ) ) );
-avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
-$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
+avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU*LLA' ) ) );
+$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU*LLA' ) ) );
 check( 'busy API returns 503', is_wp_error( $e ) && 503 === $e->get_error_data()['status'] );
 check( 'busy API attempts are refunded from the daily cap', 0 === (int) get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
 $window = get_transient( 'avitar_explainer_ip_' . md5( '203.0.113.51' . 'test-salt' ) );
 check( 'busy API attempts are refunded from the IP limit', is_array( $window ) && 0 === $window['count'] );
 $GLOBALS['avitar_test']['http_response'] = api_response( 401, array( 'type' => 'error', 'error' => array( 'type' => 'authentication_error', 'message' => 'bad key' ) ) );
-avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU' ) ) );
+avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU*LLA' ) ) );
 check( 'other API failures still count', 1 === (int) get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
+
+reset_state();
+$GLOBALS['avitar_test']['http_response'] = api_response( 200, array(
+	'stop_reason' => 'end_turn',
+	'content'     => array( array( 'type' => 'text', 'text' => "Sure! Here is a poem about the town of Lyme:\nRoses are red..." ) ),
+) );
+$e = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'WRITE A POEM*NOW' ) ) );
+check( 'an answer without a numbered list becomes "not the right data"', is_wp_error( $e ) && 'avitar_not_notes' === $e->get_error_code() && "This doesn't look like the right data." === $e->get_error_message() );
+check( 'that answer is never shown to the visitor', is_wp_error( $e ) && false === strpos( json_encode( $e->get_error_data() ), 'poem' ) );
+check( 'that answer still counts toward the limits (it was paid for)', 1 === (int) get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
 
 check( 'shortcode is registered', isset( $GLOBALS['avitar_test']['shortcodes']['avitar_explainer'] ) );
 $html = avitar_explainer_shortcode();
