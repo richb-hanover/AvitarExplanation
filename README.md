@@ -33,12 +33,17 @@ Each explanation costs roughly 4–7¢ on Opus 5.5.
 - The **Explain** button fetches a fresh security token each time, so page-caching plugins don't break it.
 - An explanation usually takes 10–30 seconds. Hosts that cut off PHP requests after 30 seconds may need a longer limit.
 - If the AI service is overloaded, the failed attempt isn't counted against the limits.
-- Errors with details (bad API key, API outages) are written to the PHP error log; visitors see a short friendly message.
+- Errors with details (bad API key, API outages) are written to the PHP error log; visitors see a short friendly message. If something fails in the browser, the page says which step failed (security token, waiting for the explanation, or showing it) and logs the error to the browser console.
+- The copy icon copies the explanation with its formatting. Copying uses the modern clipboard on HTTPS sites (and `localhost`) and falls back to the browser's own copy elsewhere.
 
 ## Development
 
 Run the tests (needs Docker):
 
     docker run --rm -v "$PWD":/app -w /app php:8.2-cli php tests/run.php
+
+Run the browser-script tests (also Docker):
+
+    docker run --rm -v "$PWD":/app -w /app/tests/js node:22-slim sh -c "npm install --no-audit --no-fund --silent && node run.js"
 
 Local WordPress: put your key in `.wp-env.override.json` as `{ "config": { "ANTHROPIC_API_KEY": "sk-ant-..." } }` (gitignored), then `npx @wordpress/env start`.

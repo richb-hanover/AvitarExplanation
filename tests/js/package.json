@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Browser-script tests for the Avitar Explainer plugin",
+  "devDependencies": {
+    "jsdom": "^25.0.1"
+  }
+}

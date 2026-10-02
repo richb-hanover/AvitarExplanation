@@ -438,7 +438,12 @@ function avitar_explainer_shortcode() {
 			.avitar-explainer__result { margin-top: 1em; line-height: 1.5; }
 			.avitar-explainer__result.is-working, .avitar-explainer__result.is-error { padding: 1em; border: 1px solid #ccc; border-radius: 4px; }
 			.avitar-explainer__result.is-error { border-color: #b32d2e; color: #b32d2e; }
-			.avitar-explainer__result h3 { margin: 0 0 0.6em; }
+			.avitar-explainer__result.is-done { position: relative; padding: 1em 1.2em; background: #eeeeee; border-radius: 4px; }
+			.avitar-explainer__result h3 { margin: 0 2em 0.6em 0; }
+			.avitar-explainer .avitar-explainer__copy { position: absolute; top: 0.6em; right: 0.6em; padding: 0.3em; line-height: 0; background: none; border: 0; box-shadow: none; color: #555; cursor: pointer; }
+			.avitar-explainer .avitar-explainer__copy:hover, .avitar-explainer .avitar-explainer__copy:focus { color: #000; }
+			.avitar-explainer .avitar-explainer__copy.is-copied { color: #1a7f37; }
+			.avitar-explainer__details { margin: 0.5em 0 0; font-size: 0.8em; color: #555; }
 			.avitar-explainer__result ol { padding-left: 1.6em; }
 			.avitar-explainer__result li { margin-bottom: 0.9em; }
 			.avitar-explainer__result li p { margin: 0.2em 0 0; }
@@ -466,6 +471,73 @@ function avitar_explainer_print_script() {
 	?>
 	<script>
 	(function () {
+		var STEPS = {
+			nonce: 'Could not get a security token from the site.',
+			explain: 'The connection to the site was lost while waiting for the explanation.',
+			response: 'Something went wrong while reading the reply.',
+			render: 'Something went wrong while showing the explanation.'
+		};
+		var SVG_NS = 'http://www.w3.org/2000/svg';
+
+		function add(parent, tag, text, className) {
+			var node = document.createElement(tag);
+			if (text) { node.textContent = text; }
+			if (className) { node.className = className; }
+			parent.appendChild(node);
+			return node;
+		}
+
+		function svg(parent, tag, attributes) {
+			var node = document.createElementNS(SVG_NS, tag);
+			Object.keys(attributes).forEach(function (name) { node.setAttribute(name, attributes[name]); });
+			parent.appendChild(node);
+			return node;
+		}
+
+		function copyIcon(button) {
+			var icon = svg(button, 'svg', {
+				viewBox: '0 0 24 24', width: '18', height: '18', fill: 'none', stroke: 'currentColor',
+				'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true'
+			});
+			svg(icon, 'rect', { x: '9', y: '9', width: '13', height: '13', rx: '2' });
+			svg(icon, 'path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' });
+		}
+
+		function plainText(body) {
+			var lines = ['Notes for this property', ''];
+			if (body.items && body.items.length) {
+				body.items.forEach(function (item, index) {
+					lines.push((index + 1) + '. ' + item.segment);
+					if (item.meaning) { lines.push(item.meaning); }
+					(item.uncertain || []).forEach(function (text) { lines.push('⚠ Uncertain: ' + text); });
+					lines.push('');
+				});
+				if (body.summary) { lines.push('Summary: ' + body.summary); }
+				(body.extra || []).forEach(function (text) { lines.push('', text); });
+			} else {
+				lines.push(body.explanation);
+			}
+			return lines.join('\n').trim() + '\n';
+		}
+
+		// Copies a detached node's contents as rich text using the browser's own selection.
+		function copyBySelection(content) {
+			content.className = 'avitar-explainer__copy-buffer';
+			content.style.position = 'fixed';
+			content.style.left = '-9999px';
+			document.body.appendChild(content);
+			var selection = window.getSelection();
+			var range = document.createRange();
+			range.selectNodeContents(content);
+			selection.removeAllRanges();
+			selection.addRange(range);
+			var copied = false;
+			try { copied = document.execCommand('copy'); } catch (error) { copied = false; }
+			selection.removeAllRanges();
+			document.body.removeChild(content);
+			return copied;
+		}
+
 		function setup(root) {
 			var rest = root.getAttribute('data-rest');
 			var textarea = root.querySelector('textarea');
@@ -477,12 +549,57 @@ function avitar_explainer_print_script() {
 				result.textContent = text;
 			}
 
-			function add(parent, tag, text, className) {
-				var node = document.createElement(tag);
-				if (text) { node.textContent = text; }
-				if (className) { node.className = className; }
-				parent.appendChild(node);
-				return node;
+			function showError(message, details) {
+				show(message, 'error');
+				if (details) { add(result, 'p', details, 'avitar-explainer__details'); }
+			}
+
+			// The explanation without the copy button and timing, with the styles that
+			// matter written inline so they survive pasting into email or a document.
+			function copyableContent() {
+				var content = document.createElement('div');
+				Array.prototype.forEach.call(result.childNodes, function (node) {
+					if (node.classList && (node.classList.contains('avitar-explainer__copy') || node.classList.contains('avitar-explainer__time'))) {
+						return;
+					}
+					content.appendChild(node.cloneNode(true));
+				});
+				Array.prototype.forEach.call(content.querySelectorAll('.avitar-explainer__uncertain'), function (node) {
+					node.setAttribute('style', 'color:#8a5a00;font-style:italic');
+				});
+				Array.prototype.forEach.call(content.querySelectorAll('.avitar-explainer__plain'), function (node) {
+					node.setAttribute('style', 'white-space:pre-wrap');
+				});
+				Array.prototype.forEach.call(content.querySelectorAll('[class]'), function (node) {
+					node.removeAttribute('class');
+				});
+				return content;
+			}
+
+			function copyExplanation(copyButton, body) {
+				var content = copyableContent();
+				function done(copied) {
+					copyButton.setAttribute('aria-label', copied ? 'Copied' : 'Copy failed');
+					copyButton.title = copied ? 'Copied' : 'Copy failed';
+					copyButton.classList.toggle('is-copied', copied);
+					setTimeout(function () {
+						copyButton.setAttribute('aria-label', 'Copy explanation');
+						copyButton.title = 'Copy explanation';
+						copyButton.classList.remove('is-copied');
+					}, 2000);
+				}
+				if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+					var item = new ClipboardItem({
+						'text/html': new Blob([content.innerHTML], { type: 'text/html' }),
+						'text/plain': new Blob([plainText(body)], { type: 'text/plain' })
+					});
+					navigator.clipboard.write([item]).then(
+						function () { done(true); },
+						function () { done(copyBySelection(content)); }
+					);
+				} else {
+					done(copyBySelection(content));
+				}
 			}
 
 			// Builds the answer from the server's structured parts. Model output only
@@ -490,6 +607,13 @@ function avitar_explainer_print_script() {
 			function showExplanation(body, seconds) {
 				result.className = 'avitar-explainer__result is-done';
 				result.textContent = '';
+				var copyButton = add(result, 'button', '', 'avitar-explainer__copy');
+				copyButton.type = 'button';
+				copyButton.title = 'Copy explanation';
+				copyButton.setAttribute('aria-label', 'Copy explanation');
+				copyIcon(copyButton);
+				copyButton.addEventListener('click', function () { copyExplanation(copyButton, body); });
+
 				add(result, 'h3', 'Notes for this property');
 				if (body.items && body.items.length) {
 					var list = add(result, 'ol');
@@ -523,13 +647,18 @@ function avitar_explainer_print_script() {
 				button.textContent = 'Working…';
 				show('Reading the notes. This usually takes 10 to 30 seconds.', 'working');
 				var started = Date.now();
+				var step = 'nonce';
+				function elapsed() {
+					return ' after ' + ((Date.now() - started) / 1000).toFixed(1) + ' s';
+				}
 
 				fetch(rest + 'nonce', { credentials: 'same-origin', cache: 'no-store' })
 					.then(function (response) {
-						if (!response.ok) { throw new Error('nonce'); }
+						if (!response.ok) { throw new Error('HTTP ' + response.status); }
 						return response.json();
 					})
 					.then(function (data) {
+						step = 'explain';
 						return fetch(rest + 'explain', {
 							method: 'POST',
 							credentials: 'same-origin',
@@ -538,16 +667,23 @@ function avitar_explainer_print_script() {
 						});
 					})
 					.then(function (response) {
-						return response.json().catch(function () { return {}; }).then(function (body) {
-							if (response.ok && body.explanation) {
+						step = 'response';
+						return response.json().catch(function () { return null; }).then(function (body) {
+							if (response.ok && body && body.explanation) {
+								step = 'render';
 								showExplanation(body, (Date.now() - started) / 1000);
 							} else {
-								show(body.message || 'Something went wrong. Please try again.', 'error');
+								showError(
+									(body && body.message) || 'Something went wrong. Please try again.',
+									'HTTP ' + response.status + (body ? '' : ' (not JSON)') + elapsed()
+								);
 							}
 						});
 					})
-					.catch(function () {
-						show('Could not reach the server. Please check your connection and try again.', 'error');
+					.catch(function (error) {
+						console.error('Avitar Explainer failed at step "' + step + '"', error);
+						var reason = error && error.message ? (error.name ? error.name + ': ' : '') + error.message : String(error);
+						showError(STEPS[step], step + ': ' + reason + elapsed());
 					})
 					.then(function () {
 						button.disabled = false;
