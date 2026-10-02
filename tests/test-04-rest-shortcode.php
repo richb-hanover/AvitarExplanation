@@ -22,6 +22,7 @@ $GLOBALS['avitar_test']['http_response'] = api_response( 200, array(
 ) );
 $r = avitar_explainer_handle_explain( new WP_REST_Request( array( 'notes' => 'CU*LLA' ) ) );
 check( 'explain returns the explanation', $r instanceof WP_REST_Response && 'Explained.' === $r->get_data()['explanation'] );
+check( 'explain returns structured parts', array() === $r->get_data()['items'] && array( 'Explained.' ) === $r->get_data()['extra'] && '' === $r->get_data()['summary'] );
 check( 'explain response does not contain the key', false === strpos( json_encode( $r->get_data() ), 'sk-ant' ) );
 check( 'explain counted toward the daily cap', 1 === get_transient( 'avitar_explainer_day_' . wp_date( 'Ymd', time() ) ) );
 
@@ -62,4 +63,8 @@ $js = ob_get_clean();
 check( 'script fetches a fresh nonce', false !== strpos( $js, "rest + 'nonce'" ) );
 check( 'script sends the nonce header', false !== strpos( $js, 'X-Avitar-Nonce' ) );
 check( 'script renders output as text, not HTML', false !== strpos( $js, 'textContent' ) && false === strpos( $js, 'innerHTML' ) );
+check( 'script adds the "Notes for this property" heading', false !== strpos( $js, 'Notes for this property' ) );
+check( 'script shows the response time', false !== strpos( $js, 'Response time' ) );
+check( 'CSS outlines only the working and error states', false !== strpos( $html, '.avitar-explainer__result.is-working, .avitar-explainer__result.is-error { padding: 1em; border:' ) && false === strpos( $html, 'is-done {' ) );
+check( 'script switches between working and done states', false !== strpos( $js, "'working')" ) && false !== strpos( $js, 'is-done' ) );
 check( 'script never contains the API key', false === strpos( $js, 'sk-ant' ) );

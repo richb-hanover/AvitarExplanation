@@ -55,10 +55,11 @@ function avitar_explainer_client_ip( array $server, $proxy_mode ) {
  * Returns the trimmed notes, or a 400 WP_Error the visitor can act on.
  */
 function avitar_explainer_validate_notes( $notes ) {
-	if ( ! is_string( $notes ) || '' === trim( $notes ) ) {
+	// Visitors often copy Avitar's "Notes:" label along with the notes themselves.
+	$notes = is_string( $notes ) ? trim( preg_replace( '/^\s*notes\s*:/i', '', $notes ) ) : '';
+	if ( '' === $notes ) {
 		return new WP_Error( 'avitar_empty', 'Please paste some tax-card notes first.', array( 'status' => 400 ) );
 	}
-	$notes = trim( $notes );
 	$max   = (int) avitar_explainer_config( 'MAX_CHARS' );
 	if ( mb_strlen( $notes, 'UTF-8' ) > $max ) {
 		return new WP_Error(
@@ -258,6 +259,52 @@ function avitar_explainer_parse_response( $response ) {
 	return $text;
 }
 
+/**
+ * Splits the model's plain-text answer (see the Format section of the system prompt)
+ * into numbered items, a summary, and any other paragraphs, so the browser can style
+ * them without ever treating model output as HTML.
+ */
+function avitar_explainer_structure_explanation( $text ) {
+	$items   = array();
+	$summary = array();
+	$extra   = array();
+	$current = null; // 'item', 'summary', or null between blocks.
+
+	foreach ( preg_split( '/\r?\n/', $text ) as $line ) {
+		$line = trim( $line );
+		if ( '' === $line ) {
+			$current = null;
+		} elseif ( preg_match( '/^\d+[.)]\s+(.+)$/u', $line, $match ) ) {
+			$items[] = array(
+				'segment'   => preg_replace( '/^["“”]|["“”]$/u', '', trim( $match[1] ) ),
+				'meaning'   => array(),
+				'uncertain' => array(),
+			);
+			$current = 'item';
+		} elseif ( preg_match( '/^Summary:\s*(.*)$/u', $line, $match ) ) {
+			$summary = array( $match[1] );
+			$current = 'summary';
+		} elseif ( 'item' === $current && preg_match( '/^⚠\x{FE0F}?\s*Uncertain:\s*(.*)$/u', $line, $match ) ) {
+			$items[ count( $items ) - 1 ]['uncertain'][] = $match[1];
+		} elseif ( 'item' === $current ) {
+			$items[ count( $items ) - 1 ]['meaning'][] = $line;
+		} elseif ( 'summary' === $current ) {
+			$summary[] = $line;
+		} else {
+			$extra[] = $line;
+		}
+	}
+
+	foreach ( $items as $i => $item ) {
+		$items[ $i ]['meaning'] = implode( ' ', $item['meaning'] );
+	}
+	return array(
+		'items'   => $items,
+		'summary' => trim( implode( ' ', $summary ) ),
+		'extra'   => $extra,
+	);
+}
+
 function avitar_explainer_api_key() {
 	return defined( 'ANTHROPIC_API_KEY' ) ? (string) ANTHROPIC_API_KEY : '';
 }
@@ -361,7 +408,16 @@ function avitar_explainer_handle_explain( $request ) {
 		}
 		return $explanation;
 	}
-	return new WP_REST_Response( array( 'explanation' => $explanation ), 200 );
+	$parts = avitar_explainer_structure_explanation( $explanation );
+	return new WP_REST_Response(
+		array(
+			'explanation' => $explanation,
+			'items'       => $parts['items'],
+			'summary'     => $parts['summary'],
+			'extra'       => $parts['extra'],
+		),
+		200
+	);
 }
 
 function avitar_explainer_shortcode() {
@@ -379,8 +435,16 @@ function avitar_explainer_shortcode() {
 			.avitar-explainer label { display: block; font-weight: 600; margin-bottom: 0.4em; }
 			.avitar-explainer textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.95em; }
 			.avitar-explainer__button { margin-top: 0.6em; }
-			.avitar-explainer__result:not(:empty) { margin-top: 1em; padding: 1em; border: 1px solid #ccc; border-radius: 4px; white-space: pre-wrap; line-height: 1.5; }
+			.avitar-explainer__result { margin-top: 1em; line-height: 1.5; }
+			.avitar-explainer__result.is-working, .avitar-explainer__result.is-error { padding: 1em; border: 1px solid #ccc; border-radius: 4px; }
 			.avitar-explainer__result.is-error { border-color: #b32d2e; color: #b32d2e; }
+			.avitar-explainer__result h3 { margin: 0 0 0.6em; }
+			.avitar-explainer__result ol { padding-left: 1.6em; }
+			.avitar-explainer__result li { margin-bottom: 0.9em; }
+			.avitar-explainer__result li p { margin: 0.2em 0 0; }
+			.avitar-explainer__uncertain { color: #8a5a00; font-style: italic; }
+			.avitar-explainer__plain { white-space: pre-wrap; }
+			.avitar-explainer__time { font-size: 0.8em; opacity: 0.6; }
 			.avitar-explainer__note { font-size: 0.85em; opacity: 0.75; }
 		</style>
 		<?php
@@ -408,20 +472,57 @@ function avitar_explainer_print_script() {
 			var button = root.querySelector('.avitar-explainer__button');
 			var result = root.querySelector('.avitar-explainer__result');
 
-			function show(text, isError) {
+			function show(text, state) {
+				result.className = 'avitar-explainer__result is-' + state;
 				result.textContent = text;
-				result.classList.toggle('is-error', isError);
+			}
+
+			function add(parent, tag, text, className) {
+				var node = document.createElement(tag);
+				if (text) { node.textContent = text; }
+				if (className) { node.className = className; }
+				parent.appendChild(node);
+				return node;
+			}
+
+			// Builds the answer from the server's structured parts. Model output only
+			// ever goes through textContent, never HTML.
+			function showExplanation(body, seconds) {
+				result.className = 'avitar-explainer__result is-done';
+				result.textContent = '';
+				add(result, 'h3', 'Notes for this property');
+				if (body.items && body.items.length) {
+					var list = add(result, 'ol');
+					body.items.forEach(function (item) {
+						var entry = add(list, 'li');
+						add(entry, 'strong', item.segment);
+						if (item.meaning) { add(entry, 'p', item.meaning); }
+						item.uncertain.forEach(function (text) {
+							add(entry, 'p', '⚠ Uncertain: ' + text, 'avitar-explainer__uncertain');
+						});
+					});
+					if (body.summary) {
+						var summary = add(result, 'p');
+						add(summary, 'strong', 'Summary: ');
+						summary.appendChild(document.createTextNode(body.summary));
+					}
+					body.extra.forEach(function (text) { add(result, 'p', text); });
+				} else {
+					add(result, 'div', body.explanation, 'avitar-explainer__plain');
+				}
+				add(result, 'p', 'Response time: ' + seconds.toFixed(1) + ' s', 'avitar-explainer__time');
 			}
 
 			button.addEventListener('click', function () {
 				var notes = textarea.value.trim();
 				if (!notes) {
-					show('Please paste some tax-card notes first.', true);
+					show('Please paste some tax-card notes first.', 'error');
 					return;
 				}
 				button.disabled = true;
 				button.textContent = 'Working…';
-				show('Reading the notes. This usually takes 10 to 30 seconds.', false);
+				show('Reading the notes. This usually takes 10 to 30 seconds.', 'working');
+				var started = Date.now();
 
 				fetch(rest + 'nonce', { credentials: 'same-origin', cache: 'no-store' })
 					.then(function (response) {
@@ -439,14 +540,14 @@ function avitar_explainer_print_script() {
 					.then(function (response) {
 						return response.json().catch(function () { return {}; }).then(function (body) {
 							if (response.ok && body.explanation) {
-								show(body.explanation, false);
+								showExplanation(body, (Date.now() - started) / 1000);
 							} else {
-								show(body.message || 'Something went wrong. Please try again.', true);
+								show(body.message || 'Something went wrong. Please try again.', 'error');
 							}
 						});
 					})
 					.catch(function () {
-						show('Could not reach the server. Please check your connection and try again.', true);
+						show('Could not reach the server. Please check your connection and try again.', 'error');
 					})
 					.then(function () {
 						button.disabled = false;

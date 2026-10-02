@@ -4,6 +4,10 @@ check( 'whitespace-only notes rejected with 400', is_wp_error( $e ) && 400 === $
 check( 'array notes rejected', is_wp_error( avitar_explainer_validate_notes( array( 'CU' ) ) ) );
 check( 'missing notes rejected', is_wp_error( avitar_explainer_validate_notes( null ) ) );
 check( 'notes are trimmed', 'CU*LLA' === avitar_explainer_validate_notes( "  CU*LLA \n" ) );
+check( 'leading "Notes:" label is removed', 'CU*LLA' === avitar_explainer_validate_notes( "Notes: CU*LLA" ) );
+check( '"Notes:" label match ignores case and spacing', 'CU' === avitar_explainer_validate_notes( "  NOTES :CU" ) );
+check( 'a bare "Notes:" counts as empty', is_wp_error( avitar_explainer_validate_notes( "Notes:  " ) ) );
+check( '"Notes" without a colon is kept', 'NOTES TO FILE*CU' === avitar_explainer_validate_notes( 'NOTES TO FILE*CU' ) );
 check( 'exactly 4000 multibyte characters accepted', is_string( avitar_explainer_validate_notes( str_repeat( 'é', 4000 ) ) ) );
 $e = avitar_explainer_validate_notes( str_repeat( 'a', 4001 ) );
 check( '4001 characters rejected with 400', is_wp_error( $e ) && 400 === $e->get_error_data()['status'] );
