@@ -122,6 +122,9 @@ async function main() {
 	check('one list item per segment', items.length === 2);
 	check('segment is bold without quotes', items[0].querySelector('strong').textContent === 'VIEW POT GOOD TOPO');
 	check('uncertain line is marked', items[1].querySelector('.avitar-explainer__uncertain').textContent === '⚠ Uncertain: OB is not a standard code.');
+	const summaryNode = p.result.querySelector('.avitar-explainer__summary');
+	check('summary is shown', !!summaryNode && summaryNode.textContent === 'Summary: A pondside lot.');
+	check('summary comes right after the heading, before the list', !!summaryNode && summaryNode.previousElementSibling.tagName === 'H3' && summaryNode.nextElementSibling.tagName === 'OL');
 	check('response time shown', /^Response time: \d+\.\d s$/.test(p.result.querySelector('.avitar-explainer__time').textContent));
 
 	console.log('copy button');
@@ -139,10 +142,11 @@ async function main() {
 	const html = item ? await readBlob(p.w, item.items['text/html']) : '';
 	const text = item ? await readBlob(p.w, item.items['text/plain']) : '';
 	check('copied HTML keeps the heading and bold segments', html.includes('Notes for this property') && html.includes('<strong>VIEW POT GOOD TOPO</strong>'));
+	check('copied HTML puts the summary before the list', html.indexOf('A pondside lot.') > -1 && html.indexOf('A pondside lot.') < html.indexOf('<ol'));
 	check('copied HTML keeps the numbered list', html.includes('<ol') && html.includes('<li'));
 	check('copied HTML styles uncertain lines inline', /<p style="[^"]*italic[^"]*">⚠ Uncertain: OB/.test(html));
 	check('copied HTML leaves out the copy button and response time', !html.includes('<button') && !html.includes('<svg') && !html.includes('Response time'));
-	check('copied plain text is a readable numbered list', text.startsWith('Notes for this property\n\n1. VIEW POT GOOD TOPO\nGood view and topography.') && text.includes('⚠ Uncertain: OB is not a standard code.') && text.includes('Summary: A pondside lot.'));
+	check('copied plain text is a readable numbered list', text.startsWith('Notes for this property\n\nSummary: A pondside lot.\n\n1. VIEW POT GOOD TOPO\nGood view and topography.') && text.includes('⚠ Uncertain: OB is not a standard code.'));
 	check('button confirms the copy', p.result.querySelector('.avitar-explainer__copy').getAttribute('aria-label') === 'Copied');
 
 	p = page({ explain: () => reply(200, SAMPLE) });

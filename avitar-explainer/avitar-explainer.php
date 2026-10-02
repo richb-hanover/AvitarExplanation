@@ -506,13 +506,13 @@ function avitar_explainer_print_script() {
 		function plainText(body) {
 			var lines = ['Notes for this property', ''];
 			if (body.items && body.items.length) {
+				if (body.summary) { lines.push('Summary: ' + body.summary, ''); }
 				body.items.forEach(function (item, index) {
 					lines.push((index + 1) + '. ' + item.segment);
 					if (item.meaning) { lines.push(item.meaning); }
 					(item.uncertain || []).forEach(function (text) { lines.push('⚠ Uncertain: ' + text); });
 					lines.push('');
 				});
-				if (body.summary) { lines.push('Summary: ' + body.summary); }
 				(body.extra || []).forEach(function (text) { lines.push('', text); });
 			} else {
 				lines.push(body.explanation);
@@ -616,6 +616,11 @@ function avitar_explainer_print_script() {
 
 				add(result, 'h3', 'Notes for this property');
 				if (body.items && body.items.length) {
+					if (body.summary) {
+						var summary = add(result, 'p', '', 'avitar-explainer__summary');
+						add(summary, 'strong', 'Summary: ');
+						summary.appendChild(document.createTextNode(body.summary));
+					}
 					var list = add(result, 'ol');
 					body.items.forEach(function (item) {
 						var entry = add(list, 'li');
@@ -625,11 +630,6 @@ function avitar_explainer_print_script() {
 							add(entry, 'p', '⚠ Uncertain: ' + text, 'avitar-explainer__uncertain');
 						});
 					});
-					if (body.summary) {
-						var summary = add(result, 'p');
-						add(summary, 'strong', 'Summary: ');
-						summary.appendChild(document.createTextNode(body.summary));
-					}
 					body.extra.forEach(function (text) { add(result, 'p', text); });
 				} else {
 					add(result, 'div', body.explanation, 'avitar-explainer__plain');
