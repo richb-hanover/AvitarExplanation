@@ -84,7 +84,7 @@ function page({ explain, nonce, clipboard }) {
 	Object.defineProperty(w, 'scrollY', { configurable: true, value: 300 });
 	w.document.querySelector('.avitar-explainer__result').getBoundingClientRect = () => ({ top: 1200 });
 	w.Element.prototype.scrollIntoView = function (options) {
-		calls.scrollIntoView.push({ element: this, options: options });
+		calls.scrollIntoView.push({ element: this, options: options, text: this.textContent });
 	};
 	w.eval(script);
 	const doc = w.document;
@@ -138,7 +138,8 @@ async function main() {
 	const summaryNode = p.result.querySelector('.avitar-explainer__summary');
 	check('summary is shown', !!summaryNode && summaryNode.textContent === 'Summary: A pondside lot.');
 	check('summary comes right after the heading, before the list', !!summaryNode && summaryNode.previousElementSibling.tagName === 'H3' && summaryNode.nextElementSibling.tagName === 'OL');
-	check('clicking Explain scrolls the label row to the top of the window', p.calls.scrollIntoView.length === 1 && p.calls.scrollIntoView[0].element.className === 'avitar-explainer__bar' && p.calls.scrollIntoView[0].options.block === 'start');
+	check('clicking Explain scrolls the "Reviewing the notes" message to the top of the window', p.calls.scrollIntoView.length === 1 && p.calls.scrollIntoView[0].element === p.result && p.calls.scrollIntoView[0].options.block === 'start');
+	check('the message is showing when the scroll happens', p.calls.scrollIntoView.length === 1 && p.calls.scrollIntoView[0].text.startsWith('Reviewing the notes'));
 	check('that scroll is smooth', p.calls.scrollIntoView.length === 1 && p.calls.scrollIntoView[0].options.behavior === 'smooth');
 	check('the arriving explanation does not scroll the page again', p.calls.scroll.length === 0 && p.calls.scrollIntoView.length === 1);
 	check('response time shown', /^Response time: \d+\.\d s$/.test(p.result.querySelector('.avitar-explainer__time').textContent));
@@ -190,7 +191,7 @@ async function main() {
 	let event = press(p, {});
 	check('Enter in the text box sends the notes like clicking Explain', p.calls.fetch.length === 1 && p.button.disabled);
 	check('Enter does not add a line break', event.defaultPrevented);
-	check('Enter also scrolls the label row to the top', p.calls.scrollIntoView.length === 1);
+	check('Enter also scrolls the message to the top', p.calls.scrollIntoView.length === 1 && p.calls.scrollIntoView[0].element === p.result);
 	event = press(p, {});
 	await settle(p);
 	check('Enter while working does not send the notes twice', p.calls.fetch.filter((url) => url.endsWith('explain')).length === 1);

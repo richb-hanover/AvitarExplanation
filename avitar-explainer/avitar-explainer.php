@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Avitar Explainer
  * Description: Adds the [avitar_explainer] shortcode, which explains Avitar Associates tax-card notes in plain English using Claude.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
@@ -467,10 +467,10 @@ function avitar_explainer_shortcode() {
 		?>
 		<style>
 			.avitar-explainer { margin: 1.5em 0; }
-			.avitar-explainer__bar { display: flex; justify-content: space-between; align-items: flex-end; gap: 1em; flex-wrap: wrap; margin-bottom: 0.4em; scroll-margin-top: calc(var(--wp-admin--admin-bar--height, 0px) + 0.5em); }
+			.avitar-explainer__bar { display: flex; justify-content: space-between; align-items: flex-end; gap: 1em; flex-wrap: wrap; margin-bottom: 0.4em; }
 			.avitar-explainer label { font-weight: 600; }
 			.avitar-explainer textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.95em; }
-			.avitar-explainer__result { margin-top: 1em; line-height: 1.5; }
+			.avitar-explainer__result { margin-top: 1em; line-height: 1.5; scroll-margin-top: calc(var(--wp-admin--admin-bar--height, 0px) + 0.5em); }
 			.avitar-explainer__result.is-working, .avitar-explainer__result.is-error { padding: 1em; border: 1px solid #ccc; border-radius: 4px; }
 			.avitar-explainer__result.is-error { border-color: #b32d2e; color: #b32d2e; }
 			.avitar-explainer__spinner { display: inline-block; width: 1em; height: 1em; margin-right: 0.5em; vertical-align: -0.15em; border: 2px solid #ccc; border-top-color: #555; border-radius: 50%; animation: avitar-explainer-spin 0.8s linear infinite; }
@@ -689,7 +689,6 @@ function avitar_explainer_print_script() {
 					show('Please paste some tax-card notes first.', 'error');
 					return;
 				}
-				scrollToTop(root.querySelector('.avitar-explainer__bar'));
 				button.disabled = true;
 				button.textContent = 'Working…';
 				show('Reviewing the notes. This usually takes 30 to 40 seconds.', 'working');
@@ -697,6 +696,7 @@ function avitar_explainer_print_script() {
 				spinner.className = 'avitar-explainer__spinner';
 				spinner.setAttribute('aria-hidden', 'true');
 				result.insertBefore(spinner, result.firstChild);
+				scrollToTop(result);
 				var started = Date.now();
 				var step = 'nonce';
 				function elapsed() {
