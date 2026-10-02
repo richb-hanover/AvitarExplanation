@@ -15,6 +15,17 @@ check( 'a long page copy is accepted when the notes are short', 'CU*LLA' === avi
 check( 'notes after "Notes:" still respect the 4000-character limit', is_wp_error( avitar_explainer_validate_notes( 'Notes: ' . str_repeat( 'a', 4001 ) ) ) );
 $e = avitar_explainer_validate_notes( str_repeat( 'a', 20001 ) . ' Notes: CU' );
 check( 'pastes over 20000 characters are rejected', is_wp_error( $e ) && 400 === $e->get_error_data()['status'] );
+
+$page = "Searches  Reports  help\nParcel ID 401-38\nNotes: VIEW POT*CU\nAvitar Associates of New England, Inc. Copyright 2026";
+check( 'whole-page paste is trimmed to the notes', 'VIEW POT*CU' === avitar_explainer_validate_notes( $page ) );
+check( 'text from "Avitar Associates of New England, Inc." on is dropped', 'VIEW POT*CU' === avitar_explainer_validate_notes( "VIEW POT*CU\nAvitar Associates of New England, Inc. Copyright 2026" ) );
+check( 'company-name match ignores case and punctuation', 'CU' === avitar_explainer_validate_notes( "CU AVITAR ASSOCIATES OF NEW ENGLAND INC" ) );
+check( 'text up to "help" is dropped', 'VIEW POT*CU' === avitar_explainer_validate_notes( "Searches  Reports  help\nVIEW POT*CU" ) );
+check( 'the last "help" before the notes is used', 'CU' === avitar_explainer_validate_notes( "help menu  help  other help\nCU" ) );
+check( '"help" after the company name does not count', 'CU*LLA' === avitar_explainer_validate_notes( "help\nCU*LLA\nAvitar Associates of New England, Inc. help" ) );
+check( 'uppercase HELP inside the notes is kept', 'SELF HELP STORAGE*CU' === avitar_explainer_validate_notes( 'SELF HELP STORAGE*CU' ) );
+check( '"helpful" is not the marker', 'helpful text*CU' === avitar_explainer_validate_notes( 'helpful text*CU' ) );
+check( 'nothing between the markers counts as empty', is_wp_error( avitar_explainer_validate_notes( "help\n  \nAvitar Associates of New England, Inc." ) ) );
 check( 'exactly 4000 multibyte characters accepted', is_string( avitar_explainer_validate_notes( str_repeat( 'é', 4000 ) ) ) );
 $e = avitar_explainer_validate_notes( str_repeat( 'a', 4001 ) );
 check( '4001 characters rejected with 400', is_wp_error( $e ) && 400 === $e->get_error_data()['status'] );

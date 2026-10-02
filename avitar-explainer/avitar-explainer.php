@@ -62,6 +62,25 @@ function avitar_explainer_max_paste_chars() {
 	return 5 * (int) avitar_explainer_config( 'MAX_CHARS' );
 }
 
+/**
+ * Pulls the notes out of text copied from the Avitar page. On that page the Notes field
+ * sits between a lowercase "help" link and the "Avitar Associates of New England, Inc."
+ * footer, and is labelled "Notes:". Text with none of these markers is returned as-is.
+ */
+function avitar_explainer_extract_notes( $text ) {
+	// Drop the footer and everything after it.
+	$text = preg_split( '/avitar\s+associates\s+of\s+new\s+england,?\s+inc\b\.?/i', $text, 2 )[0];
+
+	// Drop everything up to the last lowercase "help". Case-sensitive on purpose: the
+	// notes themselves are in capitals and may contain "HELP".
+	$help = preg_split( '/\bhelp\b/', $text );
+	$text = end( $help );
+
+	// Drop everything up to the first "Notes:" label.
+	$parts = preg_split( '/\bnotes\s*:/i', $text, 2 );
+	return trim( end( $parts ) );
+}
+
 function avitar_explainer_validate_notes( $notes ) {
 	$notes = is_string( $notes ) ? $notes : '';
 	if ( mb_strlen( $notes, 'UTF-8' ) > avitar_explainer_max_paste_chars() ) {
@@ -72,10 +91,7 @@ function avitar_explainer_validate_notes( $notes ) {
 		);
 	}
 
-	// Avitar labels the notes "Notes:". Ignore everything up to the first such label, so
-	// pasting the label (or most of the page) works; without one, use the whole text.
-	$parts = preg_split( '/\bnotes\s*:/i', $notes, 2 );
-	$notes = trim( end( $parts ) );
+	$notes = avitar_explainer_extract_notes( $notes );
 	if ( '' === $notes ) {
 		return new WP_Error( 'avitar_empty', 'Please paste some tax-card notes first.', array( 'status' => 400 ) );
 	}

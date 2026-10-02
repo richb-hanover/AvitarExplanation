@@ -42,7 +42,7 @@ Each explanation costs a few cents on Opus 5.5 (a rough estimate of 5–10¢; th
 
 - The **Explain** button fetches a fresh security token each time, so page-caching plugins don't break it.
 - An explanation usually takes 30–40 seconds. The plugin asks PHP for up to 150 seconds, but some hosts and proxies cut requests off sooner (Cloudflare at 100 seconds, some shared hosts at 30–60), so test on your host.
-- Everything up to the first "Notes:" label is ignored, so visitors can paste just the notes, the notes with their label, or most of the Avitar page. Without a "Notes:" label, the whole text is used. The text box accepts up to 5× `AVITAR_EXPLAINER_MAX_CHARS` so a whole-page paste isn't cut off; the limit applies to the notes themselves.
+- Visitors can paste just the notes, the notes with their label, or most of the Avitar page. The plugin keeps only the text between the last lowercase "help" and the "Avitar Associates of New England, Inc." footer, then drops anything up to the first "Notes:" label. Text without these markers is used as-is. The text box accepts up to 5× `AVITAR_EXPLAINER_MAX_CHARS` so a whole-page paste isn't cut off; the limit applies to the notes themselves.
 - When the explanation arrives, the page scrolls so its top is in the middle of the window.
 - If the AI service is overloaded, the failed attempt isn't counted against the limits.
 - Errors with details (bad API key, API outages) are written to the PHP error log; visitors see a short friendly message. If something fails in the browser, the page says which step failed (security token, waiting for the explanation, or showing it) and logs the error to the browser console.
