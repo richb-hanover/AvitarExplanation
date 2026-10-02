@@ -270,3 +270,159 @@ function avitar_explainer_call_api( $notes ) {
 	);
 	return avitar_explainer_parse_response( $response );
 }
+
+function avitar_explainer_register_routes() {
+	register_rest_route(
+		AVITAR_EXPLAINER_REST_NS,
+		'/nonce',
+		array(
+			'methods'             => 'GET',
+			'callback'            => 'avitar_explainer_handle_nonce',
+			'permission_callback' => '__return_true',
+		)
+	);
+	register_rest_route(
+		AVITAR_EXPLAINER_REST_NS,
+		'/explain',
+		array(
+			'methods'             => 'POST',
+			'callback'            => 'avitar_explainer_handle_explain',
+			'permission_callback' => 'avitar_explainer_verify_nonce',
+		)
+	);
+}
+add_action( 'rest_api_init', 'avitar_explainer_register_routes' );
+
+/**
+ * Served fresh on every submit so full-page caching can never hand out a stale nonce.
+ * Requests carry no X-WP-Nonce, so WordPress treats them as logged out (user 0) and
+ * the nonce matches between this call and the explain call for every visitor.
+ */
+function avitar_explainer_handle_nonce() {
+	$response = new WP_REST_Response( array( 'nonce' => wp_create_nonce( AVITAR_EXPLAINER_NONCE_ACTION ) ), 200 );
+	$response->header( 'Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0' );
+	return $response;
+}
+
+function avitar_explainer_verify_nonce( $request ) {
+	$nonce = $request->get_header( 'x_avitar_nonce' );
+	if ( $nonce && wp_verify_nonce( $nonce, AVITAR_EXPLAINER_NONCE_ACTION ) ) {
+		return true;
+	}
+	return new WP_Error( 'avitar_bad_nonce', 'This page has expired. Please reload it and try again.', array( 'status' => 403 ) );
+}
+
+function avitar_explainer_handle_explain( $request ) {
+	$notes = avitar_explainer_validate_notes( $request->get_param( 'notes' ) );
+	if ( is_wp_error( $notes ) ) {
+		return $notes;
+	}
+
+	$ip      = avitar_explainer_client_ip( $_SERVER, (bool) avitar_explainer_config( 'TRUSTED_PROXY' ) );
+	$allowed = avitar_explainer_check_rate_limit( $ip, time() );
+	if ( is_wp_error( $allowed ) ) {
+		return $allowed;
+	}
+
+	$explanation = avitar_explainer_call_api( $notes );
+	if ( is_wp_error( $explanation ) ) {
+		return $explanation;
+	}
+	return new WP_REST_Response( array( 'explanation' => $explanation ), 200 );
+}
+
+function avitar_explainer_shortcode() {
+	static $instance = 0;
+	$instance++;
+	$field_id = 'avitar-explainer-notes-' . $instance;
+
+	add_action( 'wp_footer', 'avitar_explainer_print_script' );
+
+	ob_start();
+	if ( 1 === $instance ) :
+		?>
+		<style>
+			.avitar-explainer { margin: 1.5em 0; }
+			.avitar-explainer label { display: block; font-weight: 600; margin-bottom: 0.4em; }
+			.avitar-explainer textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.95em; }
+			.avitar-explainer__button { margin-top: 0.6em; }
+			.avitar-explainer__result:not(:empty) { margin-top: 1em; padding: 1em; border: 1px solid #ccc; border-radius: 4px; white-space: pre-wrap; line-height: 1.5; }
+			.avitar-explainer__result.is-error { border-color: #b32d2e; color: #b32d2e; }
+			.avitar-explainer__note { font-size: 0.85em; opacity: 0.75; }
+		</style>
+		<?php
+	endif;
+	?>
+	<div class="avitar-explainer" data-rest="<?php echo esc_url( rest_url( AVITAR_EXPLAINER_REST_NS . '/' ) ); ?>">
+		<label for="<?php echo esc_attr( $field_id ); ?>">Paste the notes from an Avitar tax card</label>
+		<textarea id="<?php echo esc_attr( $field_id ); ?>" rows="8" maxlength="<?php echo (int) avitar_explainer_config( 'MAX_CHARS' ); ?>" placeholder="<?php echo esc_attr( 'VIEW POT GOOD TOPO* INC FORMER LOT 2 PONDSIDE*8712 SF OUT OF CU ...' ); ?>"></textarea>
+		<button type="button" class="avitar-explainer__button">Explain</button>
+		<div class="avitar-explainer__result" aria-live="polite"></div>
+		<p class="avitar-explainer__note">Explanations are AI-generated and may contain mistakes. Confirm anything important with the town assessing office.</p>
+	</div>
+	<?php
+	return ob_get_clean();
+}
+add_shortcode( 'avitar_explainer', 'avitar_explainer_shortcode' );
+
+function avitar_explainer_print_script() {
+	?>
+	<script>
+	(function () {
+		function setup(root) {
+			var rest = root.getAttribute('data-rest');
+			var textarea = root.querySelector('textarea');
+			var button = root.querySelector('.avitar-explainer__button');
+			var result = root.querySelector('.avitar-explainer__result');
+
+			function show(text, isError) {
+				result.textContent = text;
+				result.classList.toggle('is-error', isError);
+			}
+
+			button.addEventListener('click', function () {
+				var notes = textarea.value.trim();
+				if (!notes) {
+					show('Please paste some tax-card notes first.', true);
+					return;
+				}
+				button.disabled = true;
+				button.textContent = 'Working…';
+				show('Reading the notes. This usually takes 10 to 30 seconds.', false);
+
+				fetch(rest + 'nonce', { credentials: 'same-origin', cache: 'no-store' })
+					.then(function (response) {
+						if (!response.ok) { throw new Error('nonce'); }
+						return response.json();
+					})
+					.then(function (data) {
+						return fetch(rest + 'explain', {
+							method: 'POST',
+							credentials: 'same-origin',
+							headers: { 'Content-Type': 'application/json', 'X-Avitar-Nonce': data.nonce },
+							body: JSON.stringify({ notes: notes })
+						});
+					})
+					.then(function (response) {
+						return response.json().catch(function () { return {}; }).then(function (body) {
+							if (response.ok && body.explanation) {
+								show(body.explanation, false);
+							} else {
+								show(body.message || 'Something went wrong. Please try again.', true);
+							}
+						});
+					})
+					.catch(function () {
+						show('Could not reach the server. Please check your connection and try again.', true);
+					})
+					.then(function () {
+						button.disabled = false;
+						button.textContent = 'Explain';
+					});
+			});
+		}
+		document.querySelectorAll('.avitar-explainer').forEach(setup);
+	})();
+	</script>
+	<?php
+}
