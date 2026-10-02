@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Avitar Explainer
  * Description: Adds the [avitar_explainer] shortcode, which explains Avitar Associates tax-card notes in plain English using Claude.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
@@ -473,6 +473,8 @@ function avitar_explainer_shortcode() {
 			.avitar-explainer__result { margin-top: 1em; line-height: 1.5; }
 			.avitar-explainer__result.is-working, .avitar-explainer__result.is-error { padding: 1em; border: 1px solid #ccc; border-radius: 4px; }
 			.avitar-explainer__result.is-error { border-color: #b32d2e; color: #b32d2e; }
+			.avitar-explainer__spinner { display: inline-block; width: 1em; height: 1em; margin-right: 0.5em; vertical-align: -0.15em; border: 2px solid #ccc; border-top-color: #555; border-radius: 50%; animation: avitar-explainer-spin 0.8s linear infinite; }
+			@keyframes avitar-explainer-spin { to { transform: rotate(360deg); } }
 			.avitar-explainer__result.is-done { position: relative; padding: 1em 1.2em; background: #eeeeee; border-radius: 4px; }
 			.avitar-explainer__result h3 { margin: 0 2em 0.6em 0; }
 			.avitar-explainer .avitar-explainer__copy { position: absolute; top: 0.6em; right: 0.6em; padding: 0.3em; line-height: 0; background: none; border: 0; box-shadow: none; color: #555; cursor: pointer; }
@@ -691,6 +693,10 @@ function avitar_explainer_print_script() {
 				button.disabled = true;
 				button.textContent = 'Working…';
 				show('Reviewing the notes. This usually takes 30 to 40 seconds.', 'working');
+				var spinner = document.createElement('span');
+				spinner.className = 'avitar-explainer__spinner';
+				spinner.setAttribute('aria-hidden', 'true');
+				result.insertBefore(spinner, result.firstChild);
 				var started = Date.now();
 				var step = 'nonce';
 				function elapsed() {

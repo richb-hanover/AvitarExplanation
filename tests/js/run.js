@@ -124,7 +124,11 @@ async function main() {
 	p.button.click();
 	check('working message is outlined', p.result.classList.contains('is-working'));
 	check('working message gives the measured wait time', p.result.textContent === 'Reviewing the notes. This usually takes 30 to 40 seconds.');
+	const spinner = p.result.querySelector('.avitar-explainer__spinner');
+	check('a spinner sits to the left of the working message', !!spinner && p.result.firstChild === spinner);
+	check('screen readers skip the spinner', !!spinner && spinner.getAttribute('aria-hidden') === 'true');
 	await settle(p);
+	check('the spinner is gone once the explanation arrives', !p.result.querySelector('.avitar-explainer__spinner'));
 	check('finished explanation uses the done style', p.result.classList.contains('is-done') && !p.result.classList.contains('is-working'));
 	check('heading reads "Notes for this property"', p.result.querySelector('h3').textContent === 'Notes for this property');
 	const items = p.result.querySelectorAll('ol > li');
@@ -210,6 +214,7 @@ async function main() {
 	p = page({ explain: () => Promise.reject(new TypeError('NetworkError when attempting to fetch resource.')) });
 	p.button.click();
 	await settle(p);
+	check('the spinner is gone after an error', !p.result.querySelector('.avitar-explainer__spinner'));
 	check('lost connection names the waiting step', p.result.classList.contains('is-error') && p.result.textContent.includes('while waiting for the explanation'));
 	check('lost connection shows the browser error', p.result.querySelector('.avitar-explainer__details').textContent.includes('TypeError: NetworkError when attempting to fetch resource.'));
 	check('error details include the elapsed time', /after \d+\.\d s/.test(p.result.querySelector('.avitar-explainer__details').textContent));

@@ -56,6 +56,7 @@ check( 'Explain button comes before the text box', strpos( $html, '>Explain</but
 check( 'label and button share a row above the text box', 1 === preg_match( '/<div class="avitar-explainer__bar">\s*<label[^>]*>[^<]*<\/label>\s*<button[^>]*>Explain<\/button>\s*<\/div>\s*<textarea/', $html ) );
 check( 'the row pushes the button to the right edge', false !== strpos( $html, '.avitar-explainer__bar { display: flex; justify-content: space-between;' ) );
 check( 'scrolling to the row leaves room for the WordPress admin bar', false !== strpos( $html, 'scroll-margin-top: calc(var(--wp-admin--admin-bar--height, 0px) + 0.5em)' ) );
+check( 'spinner is a CSS animation', false !== strpos( $html, '@keyframes avitar-explainer-spin' ) && false !== strpos( $html, 'animation: avitar-explainer-spin' ) );
 check( 'shortcode passes the REST base URL', false !== strpos( $html, 'data-rest="https://example.test/wp-json/avitar-explainer/v1/"' ) );
 check( 'shortcode includes the AI disclaimer', false !== strpos( $html, 'may contain mistakes' ) );
 check( 'shortcode never outputs the API key', false === strpos( $html, 'sk-ant' ) );
