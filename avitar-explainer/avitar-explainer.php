@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Avitar Explainer
  * Description: Adds the [avitar_explainer] shortcode, which explains Avitar Associates tax-card notes in plain English using Claude.
- * Version: 1.0.3
+ * Version: 1.0.4
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
@@ -503,8 +503,10 @@ function avitar_explainer_shortcode() {
 			.avitar-explainer__result.is-error { border-color: #b32d2e; color: #b32d2e; }
 			.avitar-explainer__spinner { display: inline-block; width: 1em; height: 1em; margin-right: 0.5em; vertical-align: -0.15em; border: 2px solid #ccc; border-top-color: #555; border-radius: 50%; animation: avitar-explainer-spin 0.8s linear infinite; }
 			@keyframes avitar-explainer-spin { to { transform: rotate(360deg); } }
-			.avitar-explainer__result.is-done { position: relative; padding: 1em 1.2em; background: #eeeeee; border-radius: 4px; }
-			.avitar-explainer__result h3 { margin: 0 2em 0.6em 0; }
+			.avitar-explainer__heading { margin: 0 0 0.6em; font-weight: 700; }
+			.avitar-explainer__heading svg { vertical-align: -0.2em; }
+			.avitar-explainer__box { position: relative; padding: 1em 1.2em; background: #eeeeee; border-radius: 4px; }
+			.avitar-explainer__box > :first-child + * { margin-top: 0; padding-right: 2em; }
 			.avitar-explainer .avitar-explainer__copy { position: absolute; top: 0.6em; right: 0.6em; padding: 0.3em; line-height: 0; background: none; border: 0; box-shadow: none; color: #555; cursor: pointer; }
 			.avitar-explainer .avitar-explainer__copy:hover, .avitar-explainer .avitar-explainer__copy:focus { color: #000; }
 			.avitar-explainer .avitar-explainer__copy.is-copied { color: #1a7f37; }
@@ -561,8 +563,8 @@ function avitar_explainer_print_script() {
 			return node;
 		}
 
-		function copyIcon(button) {
-			var icon = svg(button, 'svg', {
+		function copyIcon(parent) {
+			var icon = svg(parent, 'svg', {
 				viewBox: '0 0 24 24', width: '18', height: '18', fill: 'none', stroke: 'currentColor',
 				'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true'
 			});
@@ -628,11 +630,12 @@ function avitar_explainer_print_script() {
 				if (details) { add(result, 'p', details, 'avitar-explainer__details'); }
 			}
 
-			// The explanation without the copy button and timing, with the styles that
-			// matter written inline so they survive pasting into email or a document.
-			function copyableContent() {
+			// The explanation under a plain heading, without the copy button and timing, with
+			// the styles that matter written inline so they survive pasting into email or a document.
+			function copyableContent(box) {
 				var content = document.createElement('div');
-				Array.prototype.forEach.call(result.childNodes, function (node) {
+				add(content, 'h3', 'Notes for this property');
+				Array.prototype.forEach.call(box.childNodes, function (node) {
 					if (node.classList && (node.classList.contains('avitar-explainer__copy') || node.classList.contains('avitar-explainer__time'))) {
 						return;
 					}
@@ -650,8 +653,8 @@ function avitar_explainer_print_script() {
 				return content;
 			}
 
-			function copyExplanation(copyButton, body) {
-				var content = copyableContent();
+			function copyExplanation(copyButton, box, body) {
+				var content = copyableContent(box);
 				function done(copied) {
 					copyButton.setAttribute('aria-label', copied ? 'Copied' : 'Copy failed');
 					copyButton.title = copied ? 'Copied' : 'Copy failed';
@@ -681,21 +684,25 @@ function avitar_explainer_print_script() {
 			function showExplanation(body, seconds) {
 				result.className = 'avitar-explainer__result is-done';
 				result.textContent = '';
-				var copyButton = add(result, 'button', '', 'avitar-explainer__copy');
+				var heading = add(result, 'p', 'Notes for this property: Click the ', 'avitar-explainer__heading');
+				copyIcon(heading);
+				heading.appendChild(document.createTextNode(' icon to copy all the notes.'));
+
+				var box = add(result, 'div', '', 'avitar-explainer__box');
+				var copyButton = add(box, 'button', '', 'avitar-explainer__copy');
 				copyButton.type = 'button';
 				copyButton.title = 'Copy explanation';
 				copyButton.setAttribute('aria-label', 'Copy explanation');
 				copyIcon(copyButton);
-				copyButton.addEventListener('click', function () { copyExplanation(copyButton, body); });
+				copyButton.addEventListener('click', function () { copyExplanation(copyButton, box, body); });
 
-				add(result, 'h3', 'Notes for this property');
 				if (body.items && body.items.length) {
 					if (body.summary) {
-						var summary = add(result, 'p', '', 'avitar-explainer__summary');
+						var summary = add(box, 'p', '', 'avitar-explainer__summary');
 						add(summary, 'strong', 'Summary: ');
 						summary.appendChild(document.createTextNode(body.summary));
 					}
-					var list = add(result, 'ol');
+					var list = add(box, 'ol');
 					body.items.forEach(function (item) {
 						var entry = add(list, 'li');
 						add(entry, 'strong', item.segment);
@@ -704,11 +711,11 @@ function avitar_explainer_print_script() {
 							add(entry, 'p', '⚠ Uncertain: ' + text, 'avitar-explainer__uncertain');
 						});
 					});
-					body.extra.forEach(function (text) { add(result, 'p', text); });
+					body.extra.forEach(function (text) { add(box, 'p', text); });
 				} else {
-					add(result, 'div', body.explanation, 'avitar-explainer__plain');
+					add(box, 'div', body.explanation, 'avitar-explainer__plain');
 				}
-				add(result, 'p', 'Response time: ' + seconds.toFixed(1) + ' s', 'avitar-explainer__time');
+				add(box, 'p', 'Response time: ' + seconds.toFixed(1) + ' s', 'avitar-explainer__time');
 			}
 
 			button.addEventListener('click', function () {
