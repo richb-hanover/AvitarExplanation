@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Avitar Explainer
  * Description: Adds the [avitar_explainer] shortcode, which explains Avitar Associates tax-card notes in plain English using Claude.
- * Version: 1.0.4
+ * Version: 1.0.5
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
@@ -63,13 +63,10 @@ function avitar_explainer_not_notes_error( $status ) {
 }
 
 /**
- * Real Avitar notes are written in capitals and separated by "*". Anything else is
- * rejected before it reaches Claude, which keeps the page from being used as a chatbot.
+ * Real Avitar notes are written in capitals. Anything else is rejected before it
+ * reaches Claude, which keeps the page from being used as a chatbot.
  */
 function avitar_explainer_looks_like_notes( $notes ) {
-	if ( false === strpos( $notes, '*' ) ) {
-		return false;
-	}
 	$upper = preg_match_all( '/\p{Lu}/u', $notes );
 	$lower = preg_match_all( '/\p{Ll}/u', $notes );
 	return $upper > 0 && $upper >= 3 * $lower; // At least 75% of letters are uppercase.
@@ -194,7 +191,7 @@ function avitar_explainer_system_prompt() {
 	return <<<'PROMPT'
 You are an expert at reading New Hampshire municipal property assessment records, especially the terse notes that Avitar Associates of New England writes on property tax cards. A member of the public will paste the notes from one card. Explain them in plain English for someone with no assessing background.
 
-The notes are a list of segments separated by "*". Each segment is a separate remark in assessor shorthand, and segments often refer to each other, so read the whole card before explaining any part of it.
+The notes are a list of segments, usually separated by "*" (a short card may have only one segment). Each segment is a separate remark in assessor shorthand, and segments often refer to each other, so read the whole card before explaining any part of it.
 
 Common abbreviations (use these unless the context clearly says otherwise):
 - CU: Current Use, New Hampshire's program (RSA 79-A) that taxes qualifying open land at its use value rather than market value. "OUT OF CU" means land was removed from Current Use, which usually triggers a Land Use Change Tax.
