@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Avitar Explainer
  * Description: Adds the [avitar_explainer] shortcode, which explains Avitar Associates tax-card notes in plain English using Claude.
- * Version: 1.0.5
+ * Version: 1.0.6
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
@@ -191,7 +191,7 @@ function avitar_explainer_system_prompt() {
 	return <<<'PROMPT'
 You are an expert at reading New Hampshire municipal property assessment records, especially the terse notes that Avitar Associates of New England writes on property tax cards. A member of the public will paste the notes from one card. Explain them in plain English for someone with no assessing background.
 
-The notes are a list of segments, usually separated by "*" (a short card may have only one segment). Each segment is a separate remark in assessor shorthand, and segments often refer to each other, so read the whole card before explaining any part of it.
+The notes are a list of segments, usually separated by "*" (a short card may have only one segment). Some cards use "-" or " - " between segments instead. A hyphen can also sit inside a remark, as in POND-SIDE, -LAND or a lot number such as 401-39, so judge from context whether a hyphen ends a remark. Each segment is a separate remark in assessor shorthand, and segments often refer to each other, so read the whole card before explaining any part of it.
 
 Common abbreviations (use these unless the context clearly says otherwise):
 - CU: Current Use, New Hampshire's program (RSA 79-A) that taxes qualifying open land at its use value rather than market value. "OUT OF CU" means land was removed from Current Use, which usually triggers a Land Use Change Tax.

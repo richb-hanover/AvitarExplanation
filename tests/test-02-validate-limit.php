@@ -30,6 +30,8 @@ check( 'nothing between the markers counts as empty', is_wp_error( avitar_explai
 $sample = 'VIEW POT GOOD TOPO* INC FORMER LOT 2 PONDSIDE*8712 SF OUT OF CU POND-SIDE & OB PONDSIDE -LAND OUT OF CU NOT "HSE SITE"=REC LOT ADJ W/100 WFFF*RMVBL DOCK/ WET AROUND OB*1/2006; LLA 1.16 AC TO 401-39*SEPTIC EASEMENT FOR L141 HERE= SAME OWNER*9/14 S INC LOT141=1G MULTI PARCEL*CU5;2/2/1*RD THRU LOT WF SIDE=UNB=RECLOT COND FACTOR';
 check( 'the sample card passes the data check', $sample === avitar_explainer_validate_notes( $sample ) );
 check( 'a whole-page paste passes the data check once trimmed', 'VIEW POT*CU' === avitar_explainer_validate_notes( $page ) );
+$dashed = 'VERY STEEP LOT-NO RD FRONTAGE-ACC IS ACROSS ABUTTING LOT OR BY BOAT- NO ACC TO POND DEVELOPED PAUL & JUDY OWNN 50% INT-JOHN AND THOMAS OWN 25% EACH 2/14 TRANSFER INC. 407-95 / 19 / 20 / 23';
+check( 'a card separated by "-" passes the data check', $dashed === avitar_explainer_validate_notes( $dashed ) );
 check( 'notes without any "*" are accepted', 'VIEW POT GOOD TOPO' === avitar_explainer_validate_notes( 'VIEW POT GOOD TOPO' ) );
 $e = avitar_explainer_validate_notes( 'write a poem about the town' );
 check( 'lowercase text without "*" is not the right data', is_wp_error( $e ) && 'avitar_not_notes' === $e->get_error_code() && 400 === $e->get_error_data()['status'] );
