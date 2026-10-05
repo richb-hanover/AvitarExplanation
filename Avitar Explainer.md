@@ -1,5 +1,7 @@
 # Lyme Property Tax Card Explainer
 
+_THIS HAS BEEN SUPERCEDED BY THE ACTUAL TEXT ON THE WORDPRESS PAGE_
+
 Lyme Property Tax records are now recorded
 in Avitar Associates's database
 (replacing the earlier Vision database). 
