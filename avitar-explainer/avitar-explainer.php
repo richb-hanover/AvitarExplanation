@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Avitar Explainer
  * Description: Adds the [avitar_explainer] shortcode, which explains Avitar Associates tax-card notes in plain English using Claude.
- * Version: 1.0.6
+ * Version: 1.0.7
  * Requires at least: 6.0
  * Requires PHP: 7.4
  * License: GPL-2.0-or-later
@@ -78,12 +78,16 @@ function avitar_explainer_max_paste_chars() {
 
 /**
  * Pulls the notes out of text copied from the Avitar page. On that page the Notes field
- * sits between a lowercase "help" link and the "Avitar Associates of New England, Inc."
- * footer, and is labelled "Notes:". Text with none of these markers is returned as-is.
+ * sits between a lowercase "help" link and either the "History Of Taxable Values" heading
+ * or the "Avitar Associates of New England, Inc." footer, and is labelled "Notes:". Text
+ * with none of these markers is returned as-is.
  */
 function avitar_explainer_extract_notes( $text ) {
 	// Drop the footer and everything after it.
 	$text = preg_split( '/avitar\s+associates\s+of\s+new\s+england,?\s+inc\b\.?/i', $text, 2 )[0];
+
+	// Drop the "History Of Taxable Values" table and everything after it.
+	$text = preg_split( '/\bhistory\s+of\s+taxable\s+values\b/i', $text, 2 )[0];
 
 	// Drop everything up to the last lowercase "help". Case-sensitive on purpose: the
 	// notes themselves are in capitals and may contain "HELP".

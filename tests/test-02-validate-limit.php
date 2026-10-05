@@ -20,6 +20,8 @@ $page = "Searches  Reports  help\nParcel ID 401-38\nNotes: VIEW POT*CU\nAvitar A
 check( 'whole-page paste is trimmed to the notes', 'VIEW POT*CU' === avitar_explainer_extract_notes( $page ) );
 check( 'text from "Avitar Associates of New England, Inc." on is dropped', 'VIEW POT*CU' === avitar_explainer_extract_notes( "VIEW POT*CU\nAvitar Associates of New England, Inc. Copyright 2026" ) );
 check( 'company-name match ignores case and punctuation', 'CU' === avitar_explainer_extract_notes( "CU AVITAR ASSOCIATES OF NEW ENGLAND INC" ) );
+check( 'text from "History Of Taxable Values" on is dropped', 'VIEW POT*CU' === avitar_explainer_extract_notes( "help\nNotes: VIEW POT*CU\nHistory Of Taxable Values\n2025 LAND 120,000 BUILDING 300,000\nAvitar Associates of New England, Inc." ) );
+check( 'taxable-values match ignores case and spacing', 'CU' === avitar_explainer_extract_notes( "CU HISTORY  OF\nTAXABLE VALUES 2025" ) );
 check( 'text up to "help" is dropped', 'VIEW POT*CU' === avitar_explainer_extract_notes( "Searches  Reports  help\nVIEW POT*CU" ) );
 check( 'the last "help" before the notes is used', 'CU' === avitar_explainer_extract_notes( "help menu  help  other help\nCU" ) );
 check( '"help" after the company name does not count', 'CU*LLA' === avitar_explainer_extract_notes( "help\nCU*LLA\nAvitar Associates of New England, Inc. help" ) );
